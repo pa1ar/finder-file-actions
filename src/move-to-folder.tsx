@@ -145,7 +145,22 @@ export default function Command(props: LaunchProps) {
           kMDItemContentModificationDate: folder.kMDItemContentModificationDate ? new Date(folder.kMDItemContentModificationDate) : undefined,
           kMDItemFSCreationDate: folder.kMDItemFSCreationDate ? new Date(folder.kMDItemFSCreationDate) : undefined,
         }));
-        setRecentFolders(foldersWithDates);
+        
+        // Filter out folders that no longer exist
+        const existingFolders = foldersWithDates.filter((folder: RecentFolder) => {
+          const exists = fs.existsSync(folder.path);
+          if (!exists) {
+            console.log(`Removing non-existent folder from recent folders: ${folder.path}`);
+          }
+          return exists;
+        });
+        
+        setRecentFolders(existingFolders);
+        
+        // If we filtered out any folders, save the updated list
+        if (existingFolders.length !== foldersWithDates.length) {
+          saveRecentFolders(existingFolders);
+        }
       }
       setHasCheckedPreferences(true);
     } catch (error) {
@@ -165,6 +180,12 @@ export default function Command(props: LaunchProps) {
 
   // Add folder to recent folders
   function addToRecentFolders(folder: SpotlightSearchResult) {
+    // Check if folder exists before adding to recent folders
+    if (!fs.existsSync(folder.path)) {
+      console.error(`Cannot add non-existent folder to recent folders: ${folder.path}`);
+      return;
+    }
+    
     const recentFolder: RecentFolder = {
       ...folder,
       lastUsed: new Date(),
@@ -226,6 +247,17 @@ export default function Command(props: LaunchProps) {
 
   // Move files to selected folder
   async function moveFilesToFolder(destinationPath: string) {
+    // Check if destination folder exists
+    if (!fs.existsSync(destinationPath)) {
+      console.error(`Destination folder does not exist: ${destinationPath}`);
+      showToast({
+        title: "Error",
+        message: `Destination folder does not exist: ${path.basename(destinationPath)}`,
+        style: Toast.Style.Failure,
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -310,6 +342,17 @@ export default function Command(props: LaunchProps) {
 
   // Copy files to selected folder
   async function copyFilesToFolder(destinationPath: string) {
+    // Check if destination folder exists
+    if (!fs.existsSync(destinationPath)) {
+      console.error(`Destination folder does not exist: ${destinationPath}`);
+      showToast({
+        title: "Error",
+        message: `Destination folder does not exist: ${path.basename(destinationPath)}`,
+        style: Toast.Style.Failure,
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -392,12 +435,8 @@ export default function Command(props: LaunchProps) {
     setIsLoading(false);
   }
 
-  // Navigate to a folder (for browsing)
-  function navigateToFolder(folderPath: string) {
-    setCurrentPath(folderPath);
-    setSearchText("");
-    
-    // List the contents of the folder
+  // Load folder contents
+  function loadFolderContents(folderPath: string) {
     try {
       const contents = fs.readdirSync(folderPath);
       const folderContents: SpotlightSearchResult[] = [];
@@ -425,7 +464,7 @@ export default function Command(props: LaunchProps) {
         }
       }
       
-      setFolders(folderContents.sort((a, b) => a.kMDItemFSName.localeCompare(b.kMDItemFSName)));
+      return folderContents.sort((a, b) => a.kMDItemFSName.localeCompare(b.kMDItemFSName));
     } catch (error) {
       console.error(`Error reading folder ${folderPath}:`, error);
       showToast({
@@ -433,14 +472,50 @@ export default function Command(props: LaunchProps) {
         message: "Failed to read folder contents",
         style: Toast.Style.Failure,
       });
+      return [];
     }
+  }
+
+  // Load subfolders whenever currentPath changes
+  useEffect(() => {
+    if (currentPath && fs.existsSync(currentPath)) {
+      const folderContents = loadFolderContents(currentPath);
+      setFolders(folderContents);
+    }
+  }, [currentPath]);
+
+  // Navigate to a folder (for browsing)
+  function navigateToFolder(folderPath: string) {
+    // Check if folder exists before attempting to navigate
+    if (!fs.existsSync(folderPath)) {
+      console.error(`Folder does not exist: ${folderPath}`);
+      showToast({
+        title: "Error",
+        message: `Folder does not exist: ${path.basename(folderPath)}`,
+        style: Toast.Style.Failure,
+      });
+      return;
+    }
+    
+    setCurrentPath(folderPath);
+    setSearchText("");
   }
 
   // Go up one level
   function navigateUp() {
     if (currentPath) {
       const parentPath = path.dirname(currentPath);
-      navigateToFolder(parentPath);
+      // Check if parent path exists before navigating
+      if (fs.existsSync(parentPath)) {
+        navigateToFolder(parentPath);
+      } else {
+        console.error(`Parent folder does not exist: ${parentPath}`);
+        showToast({
+          title: "Error",
+          message: `Cannot navigate up: folder does not exist`,
+          style: Toast.Style.Failure,
+        });
+      }
     }
   }
 
@@ -512,78 +587,6 @@ export default function Command(props: LaunchProps) {
               </ActionPanel>
             }
           />
-        </List.Section>
-      )}
-      
-      {!searchText && recentFolders.length > 0 && (
-        <List.Section title="Recent Folders">
-          {recentFolders.map((folder) => (
-            <List.Item
-              key={folder.path}
-              title={folderName(folder)}
-              subtitle={folder.path}
-              icon={Icon.Clock}
-              accessories={[
-                { 
-                  text: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleDateString()}` : "",
-                  tooltip: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleString()}` : "",
-                }
-              ]}
-              detail={
-                <List.Item.Detail
-                  metadata={
-                    <List.Item.Detail.Metadata>
-                      <List.Item.Detail.Metadata.Label title="Metadata" />
-                      <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label
-                        title="Created"
-                        text={folder.kMDItemFSCreationDate?.toLocaleString()}
-                      />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label
-                        title="Modified"
-                        text={folder.kMDItemContentModificationDate?.toLocaleString()}
-                      />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label
-                        title="Last used"
-                        text={folder.lastUsed?.toLocaleString() || "-"}
-                      />
-                    </List.Item.Detail.Metadata>
-                  }
-                />
-              }
-              actions={
-                <ActionPanel>
-                  <Action
-                    title="Navigate to Folder"
-                    onAction={() => navigateToFolder(folder.path)}
-                  />
-                  <Action
-                    title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
-                    shortcut={{ modifiers: ["cmd"], key: "return" }}
-                    onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
-                  />
-                  <Action
-                    title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                    onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
-                  />
-                  <Action
-                    title="Toggle Details"
-                    icon={Icon.Sidebar}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
-                    onAction={() => setIsShowingDetail(!isShowingDetail)}
-                  />
-                </ActionPanel>
-              }
-            />
-          ))}
         </List.Section>
       )}
       
@@ -660,6 +663,78 @@ export default function Command(props: LaunchProps) {
           />
         ))}
       </List.Section>
+      
+      {!searchText && recentFolders.length > 0 && (
+        <List.Section title="Recent Folders">
+          {recentFolders.map((folder) => (
+            <List.Item
+              key={folder.path}
+              title={folderName(folder)}
+              subtitle={folder.path}
+              icon={Icon.Clock}
+              accessories={[
+                { 
+                  text: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleDateString()}` : "",
+                  tooltip: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleString()}` : "",
+                }
+              ]}
+              detail={
+                <List.Item.Detail
+                  metadata={
+                    <List.Item.Detail.Metadata>
+                      <List.Item.Detail.Metadata.Label title="Metadata" />
+                      <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label
+                        title="Created"
+                        text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                      />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label
+                        title="Modified"
+                        text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                      />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label
+                        title="Last used"
+                        text={folder.lastUsed?.toLocaleString() || "-"}
+                      />
+                    </List.Item.Detail.Metadata>
+                  }
+                />
+              }
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Navigate to Folder"
+                    onAction={() => navigateToFolder(folder.path)}
+                  />
+                  <Action
+                    title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                    shortcut={{ modifiers: ["cmd"], key: "return" }}
+                    onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
+                  />
+                  <Action
+                    title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                    onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
+                  />
+                  <Action
+                    title="Toggle Details"
+                    icon={Icon.Sidebar}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                    onAction={() => setIsShowingDetail(!isShowingDetail)}
+                  />
+                </ActionPanel>
+              }
+            />
+          ))}
+        </List.Section>
+      )}
     </List>
   );
 } 
