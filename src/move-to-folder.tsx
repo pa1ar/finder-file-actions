@@ -53,10 +53,67 @@ export default function Command(props: LaunchProps) {
   const [isCopyMode, setIsCopyMode] = useState<boolean>(props?.arguments?.mode === "copy");
   const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
   const [searchResultsKey, setSearchResultsKey] = useState<number>(0);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
 
   const abortable = useRef<AbortController>();
   const preferences = getPreferenceValues<SpotlightSearchPreferences>();
   const maxRecentFolders = parseInt(preferences.maxRecentFolders || "10");
+
+  // Function to check if Finder is the frontmost application
+  async function isFinderFrontmost() {
+    try {
+      const result = await runAppleScript(`
+        tell application "System Events"
+          set frontApp to name of first application process whose frontmost is true
+          if frontApp is "Finder" then
+            return true
+          else
+            return false
+          end if
+        end tell
+      `);
+      return result.trim() === "true";
+    } catch (error) {
+      console.error("Error checking if Finder is frontmost:", error);
+      return false;
+    }
+  }
+
+  // Function to get selected files from Finder
+  async function getSelectedFinderFiles() {
+    try {
+      // First check if Finder is the frontmost application
+      const finderIsFrontmost = await isFinderFrontmost();
+      if (!finderIsFrontmost) {
+        setSelectionError("Please select files in Finder first and make sure Finder is the active application.");
+        setIsLoading(false);
+        return;
+      }
+
+      const selectedItems = await getSelectedFinderItems();
+      
+      if (selectedItems && selectedItems.length > 0) {
+        const filePaths = selectedItems.map(item => item.path);
+        setSelectedFiles(filePaths);
+        setSelectionError(null);
+        setIsLoading(false);
+      } else {
+        setSelectionError("No files selected. Please select files in Finder first.");
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error(error);
+      
+      // Check if the error is because Finder isn't the frontmost application
+      if (error instanceof Error && error.message.includes("Finder isn't the frontmost application")) {
+        setSelectionError("Please select files in Finder first and make sure Finder is the active application.");
+      } else {
+        setSelectionError("Failed to get selected files from Finder. Please try again.");
+      }
+      
+      setIsLoading(false);
+    }
+  }
 
   // Load user preferences
   useEffect(() => {
@@ -102,32 +159,6 @@ export default function Command(props: LaunchProps) {
 
   // Get selected files from Finder
   useEffect(() => {
-    async function getSelectedFinderFiles() {
-      try {
-        const selectedItems = await getSelectedFinderItems();
-        
-        if (selectedItems && selectedItems.length > 0) {
-          const filePaths = selectedItems.map(item => item.path);
-          setSelectedFiles(filePaths);
-          setIsLoading(false);
-        } else {
-          showToast({
-            title: "No files selected",
-            message: "Please select files in Finder first",
-            style: Toast.Style.Failure,
-          });
-        }
-      } catch (error) {
-        console.error(error);
-        showToast({
-          title: "Error",
-          message: "Failed to get selected files from Finder",
-          style: Toast.Style.Failure,
-        });
-        setIsLoading(false);
-      }
-    }
-
     getSelectedFinderFiles();
     loadRecentFolders();
   }, []);
@@ -559,209 +590,231 @@ export default function Command(props: LaunchProps) {
       isShowingDetail={isShowingDetail}
       selectedItemId={selectedItemId}
     >
-      {selectedFiles.length > 0 && (
-        <List.Section title="Selected Files">
-          {selectedFiles.map((filePath, index) => (
-            <List.Item
-              key={`file-${index}`}
-              title={path.basename(filePath)}
-              subtitle={path.dirname(filePath)}
-              icon={Icon.Document}
-            />
-          ))}
-        </List.Section>
-      )}
-      
-      {currentPath && (
-        <List.Section title="Navigation">
-          <List.Item
-            title="Go Up One Level"
-            subtitle={path.dirname(currentPath)}
-            icon={Icon.ArrowUp}
-            actions={
-              <ActionPanel>
-                <Action title="Go Up" onAction={navigateUp} />
-              </ActionPanel>
-            }
-          />
-          <List.Item
-            title={path.basename(currentPath)}
-            subtitle={currentPath}
-            icon={Icon.Folder}
-            actions={
-              <ActionPanel>
-                <Action
-                  title="Navigate to Folder"
-                  onAction={() => navigateToFolder(currentPath)}
+      {selectionError ? (
+        <List.EmptyView
+          title="File Selection Required"
+          description={selectionError}
+          icon={Icon.ExclamationMark}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Try Again"
+                onAction={() => {
+                  setIsLoading(true);
+                  setSelectionError(null);
+                  getSelectedFinderFiles();
+                }}
+              />
+            </ActionPanel>
+          }
+        />
+      ) : (
+        <>
+          {selectedFiles.length > 0 && (
+            <List.Section title="Selected Files">
+              {selectedFiles.map((filePath, index) => (
+                <List.Item
+                  key={`file-${index}`}
+                  title={path.basename(filePath)}
+                  subtitle={path.dirname(filePath)}
+                  icon={Icon.Document}
                 />
-                <Action
-                  title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
-                  shortcut={{ modifiers: ["cmd"], key: "return" }}
-                  onAction={() => isCopyMode ? copyFilesToFolder(currentPath) : moveFilesToFolder(currentPath)}
-                />
-                <Action
-                  title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
-                  shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                  onAction={() => isCopyMode ? moveFilesToFolder(currentPath) : copyFilesToFolder(currentPath)}
-                />
-                <Action
-                  title="Toggle Details"
-                  icon={Icon.Sidebar}
-                  shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
-                  onAction={() => setIsShowingDetail(!isShowingDetail)}
-                />
-              </ActionPanel>
-            }
-          />
-        </List.Section>
-      )}
-      
-      <List.Section title={currentPath ? "Subfolders" : (searchText ? "Search Results" : "Search for a folder")}>
-        {folders.map((folder) => (
-          <List.Item
-            key={folder.path}
-            id={folder.path}
-            title={folderName(folder)}
-            subtitle={folder.path}
-            icon={Icon.Folder}
-            accessories={[
-              { 
-                text: folder.kMDItemContentModificationDate 
-                  ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleDateString()}` 
-                  : "",
-                tooltip: folder.kMDItemContentModificationDate 
-                  ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleString()}` 
-                  : "",
-              }
-            ]}
-            detail={
-              <List.Item.Detail
-                metadata={
-                  <List.Item.Detail.Metadata>
-                    <List.Item.Detail.Metadata.Label title="Metadata" />
-                    <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
-                    <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
-                    <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
-                    <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Label
-                      title="Created"
-                      text={folder.kMDItemFSCreationDate?.toLocaleString()}
-                    />
-                    <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Label
-                      title="Modified"
-                      text={folder.kMDItemContentModificationDate?.toLocaleString()}
-                    />
-                    <List.Item.Detail.Metadata.Separator />
-                    <List.Item.Detail.Metadata.Label
-                      title="Last used"
-                      text={folder.kMDItemLastUsedDate?.toLocaleString() || "-"}
-                    />
-                  </List.Item.Detail.Metadata>
+              ))}
+            </List.Section>
+          )}
+          
+          {currentPath && (
+            <List.Section title="Navigation">
+              <List.Item
+                title="Go Up One Level"
+                subtitle={path.dirname(currentPath)}
+                icon={Icon.ArrowUp}
+                actions={
+                  <ActionPanel>
+                    <Action title="Go Up" onAction={navigateUp} />
+                  </ActionPanel>
                 }
               />
-            }
-            actions={
-              <ActionPanel>
-                <Action
-                  title="Navigate to Folder"
-                  onAction={() => navigateToFolder(folder.path)}
-                />
-                <Action
-                  title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
-                  shortcut={{ modifiers: ["cmd"], key: "return" }}
-                  onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
-                />
-                <Action
-                  title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
-                  shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                  onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
-                />
-                <Action
-                  title="Toggle Details"
-                  icon={Icon.Sidebar}
-                  shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
-                  onAction={() => setIsShowingDetail(!isShowingDetail)}
-                />
-              </ActionPanel>
-            }
-          />
-        ))}
-      </List.Section>
-      
-      {!searchText && recentFolders.length > 0 && (
-        <List.Section title="Recent Folders">
-          {recentFolders.map((folder) => (
-            <List.Item
-              key={folder.path}
-              id={folder.path}
-              title={folderName(folder)}
-              subtitle={folder.path}
-              icon={Icon.Clock}
-              accessories={[
-                { 
-                  text: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleDateString()}` : "",
-                  tooltip: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleString()}` : "",
+              <List.Item
+                title={path.basename(currentPath)}
+                subtitle={currentPath}
+                icon={Icon.Folder}
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title="Navigate to Folder"
+                      onAction={() => navigateToFolder(currentPath)}
+                    />
+                    <Action
+                      title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                      shortcut={{ modifiers: ["cmd"], key: "return" }}
+                      onAction={() => isCopyMode ? copyFilesToFolder(currentPath) : moveFilesToFolder(currentPath)}
+                    />
+                    <Action
+                      title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                      onAction={() => isCopyMode ? moveFilesToFolder(currentPath) : copyFilesToFolder(currentPath)}
+                    />
+                    <Action
+                      title="Toggle Details"
+                      icon={Icon.Sidebar}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                      onAction={() => setIsShowingDetail(!isShowingDetail)}
+                    />
+                  </ActionPanel>
                 }
-              ]}
-              detail={
-                <List.Item.Detail
-                  metadata={
-                    <List.Item.Detail.Metadata>
-                      <List.Item.Detail.Metadata.Label title="Metadata" />
-                      <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label
-                        title="Created"
-                        text={folder.kMDItemFSCreationDate?.toLocaleString()}
+              />
+            </List.Section>
+          )}
+          
+          <List.Section title={currentPath ? "Subfolders" : (searchText ? "Search Results" : "Search for a folder")}>
+            {folders.map((folder) => (
+              <List.Item
+                key={folder.path}
+                id={folder.path}
+                title={folderName(folder)}
+                subtitle={folder.path}
+                icon={Icon.Folder}
+                accessories={[
+                  { 
+                    text: folder.kMDItemContentModificationDate 
+                      ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleDateString()}` 
+                      : "",
+                    tooltip: folder.kMDItemContentModificationDate 
+                      ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleString()}` 
+                      : "",
+                  }
+                ]}
+                detail={
+                  <List.Item.Detail
+                    metadata={
+                      <List.Item.Detail.Metadata>
+                        <List.Item.Detail.Metadata.Label title="Metadata" />
+                        <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Created"
+                          text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                        />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Modified"
+                          text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                        />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Last used"
+                          text={folder.kMDItemLastUsedDate?.toLocaleString() || "-"}
+                        />
+                      </List.Item.Detail.Metadata>
+                    }
+                  />
+                }
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title="Navigate to Folder"
+                      onAction={() => navigateToFolder(folder.path)}
+                    />
+                    <Action
+                      title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                      shortcut={{ modifiers: ["cmd"], key: "return" }}
+                      onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
+                    />
+                    <Action
+                      title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                      onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
+                    />
+                    <Action
+                      title="Toggle Details"
+                      icon={Icon.Sidebar}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                      onAction={() => setIsShowingDetail(!isShowingDetail)}
+                    />
+                  </ActionPanel>
+                }
+              />
+            ))}
+          </List.Section>
+          
+          {!searchText && recentFolders.length > 0 && (
+            <List.Section title="Recent Folders">
+              {recentFolders.map((folder) => (
+                <List.Item
+                  key={folder.path}
+                  id={folder.path}
+                  title={folderName(folder)}
+                  subtitle={folder.path}
+                  icon={Icon.Clock}
+                  accessories={[
+                    { 
+                      text: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleDateString()}` : "",
+                      tooltip: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleString()}` : "",
+                    }
+                  ]}
+                  detail={
+                    <List.Item.Detail
+                      metadata={
+                        <List.Item.Detail.Metadata>
+                          <List.Item.Detail.Metadata.Label title="Metadata" />
+                          <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Created"
+                            text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                          />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Modified"
+                            text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                          />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Last used"
+                            text={folder.lastUsed?.toLocaleString() || "-"}
+                          />
+                        </List.Item.Detail.Metadata>
+                      }
+                    />
+                  }
+                  actions={
+                    <ActionPanel>
+                      <Action
+                        title="Navigate to Folder"
+                        onAction={() => navigateToFolder(folder.path)}
                       />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label
-                        title="Modified"
-                        text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                      <Action
+                        title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                        shortcut={{ modifiers: ["cmd"], key: "return" }}
+                        onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
                       />
-                      <List.Item.Detail.Metadata.Separator />
-                      <List.Item.Detail.Metadata.Label
-                        title="Last used"
-                        text={folder.lastUsed?.toLocaleString() || "-"}
+                      <Action
+                        title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                        onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
                       />
-                    </List.Item.Detail.Metadata>
+                      <Action
+                        title="Toggle Details"
+                        icon={Icon.Sidebar}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                        onAction={() => setIsShowingDetail(!isShowingDetail)}
+                      />
+                    </ActionPanel>
                   }
                 />
-              }
-              actions={
-                <ActionPanel>
-                  <Action
-                    title="Navigate to Folder"
-                    onAction={() => navigateToFolder(folder.path)}
-                  />
-                  <Action
-                    title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
-                    shortcut={{ modifiers: ["cmd"], key: "return" }}
-                    onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
-                  />
-                  <Action
-                    title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                    onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
-                  />
-                  <Action
-                    title="Toggle Details"
-                    icon={Icon.Sidebar}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
-                    onAction={() => setIsShowingDetail(!isShowingDetail)}
-                  />
-                </ActionPanel>
-              }
-            />
-          ))}
-        </List.Section>
+              ))}
+            </List.Section>
+          )}
+        </>
       )}
     </List>
   );
