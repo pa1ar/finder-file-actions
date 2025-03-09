@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "finder-file-actions",
   "title": "Finder File Actions",
-  "description": "Perform actions on selected Finder files",
+  "description": "Perform actions (move, copy) on selected Finder files",
   "icon": "finder-file-actions.png",
   "keywords": [
     "finder",
