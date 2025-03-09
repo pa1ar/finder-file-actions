@@ -163,6 +163,12 @@ export default function Command() {
 
   // Add folder to recent folders
   function addToRecentFolders(folder: SpotlightSearchResult) {
+    // Check if folder exists before adding to recent folders
+    if (!fs.existsSync(folder.path)) {
+      console.error(`Cannot add non-existent folder to recent folders: ${folder.path}`);
+      return;
+    }
+    
     const recentFolder: RecentFolder = {
       ...folder,
       lastUsed: new Date(),
@@ -176,6 +182,19 @@ export default function Command() {
     
     setRecentFolders(newRecentFolders);
     saveRecentFolders(newRecentFolders);
+  }
+
+  // Remove folder from recent folders
+  async function removeFromRecentFolders(folderPath: string) {
+    const updatedFolders = recentFolders.filter(f => f.path !== folderPath);
+    setRecentFolders(updatedFolders);
+    await saveRecentFolders(updatedFolders);
+    
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Removed from Recent Folders",
+      message: folderPath,
+    });
   }
 
   // Perform search
@@ -573,6 +592,12 @@ export default function Command() {
                     shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
                     onAction={() => setIsShowingDetail(!isShowingDetail)}
                   />
+                  <Action
+                    title="Remove this recent folder"
+                    icon={Icon.Trash}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
+                    onAction={() => removeFromRecentFolders(folder.path)}
+                  />
                 </ActionPanel>
               }
             />
@@ -647,6 +672,12 @@ export default function Command() {
                   icon={Icon.Sidebar}
                   shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
                   onAction={() => setIsShowingDetail(!isShowingDetail)}
+                />
+                <Action
+                  title="Remove from Recent Folders"
+                  icon={Icon.Trash}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
+                  onAction={() => removeFromRecentFolders(folder.path)}
                 />
               </ActionPanel>
             }

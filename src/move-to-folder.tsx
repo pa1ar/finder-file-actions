@@ -234,6 +234,19 @@ export default function Command(props: LaunchProps) {
     saveRecentFolders(newRecentFolders);
   }
 
+  // Remove folder from recent folders
+  async function removeFromRecentFolders(folderPath: string) {
+    const updatedFolders = recentFolders.filter(f => f.path !== folderPath);
+    setRecentFolders(updatedFolders);
+    await saveRecentFolders(updatedFolders);
+    
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Removed from Recent Folders",
+      message: folderPath,
+    });
+  }
+
   // Perform search
   usePromise(
     searchSpotlight,
@@ -736,6 +749,12 @@ export default function Command(props: LaunchProps) {
                       shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
                       onAction={() => setIsShowingDetail(!isShowingDetail)}
                     />
+                    <Action
+                      title="Remove this Recent Folder"
+                      icon={Icon.Trash}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
+                      onAction={() => removeFromRecentFolders(folder.path)}
+                    />
                   </ActionPanel>
                 }
               />
@@ -807,6 +826,12 @@ export default function Command(props: LaunchProps) {
                         icon={Icon.Sidebar}
                         shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
                         onAction={() => setIsShowingDetail(!isShowingDetail)}
+                      />
+                      <Action
+                        title="Remove this Recent Folder"
+                        icon={Icon.Trash}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
+                        onAction={() => removeFromRecentFolders(folder.path)}
                       />
                     </ActionPanel>
                   }
