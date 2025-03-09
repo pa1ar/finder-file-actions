@@ -53,23 +53,6 @@
       "required": false,
       "title": "Recent Folders Count",
       "type": "textfield"
-    },
-    {
-      "default": false,
-      "description": "Enables support for custom 'AppleScript' plugins in Folder Search. See README",
-      "label": "Enabled",
-      "name": "pluginsEnabled",
-      "required": false,
-      "title": "Plugins Enabled",
-      "type": "checkbox"
-    },
-    {
-      "default": "",
-      "description": "The Folder in which your plugins, for Folder Search, are stored",
-      "name": "pluginsFolder",
-      "required": false,
-      "title": "Plugins Folder (Absolute Path)",
-      "type": "textfield"
     }
   ],
   "dependencies": {
