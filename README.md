@@ -1,11 +1,11 @@
 # Move to Folder
 
-A Raycast extension that allows you to quickly move selected files in Finder to a destination folder of your choice.
+A Raycast extension that allows you to quickly move selected files in Finder to a destination folder of your choice. Alfred users will be familiar with this functionality.
 
 ## Features
 
 - Move one or more files selected in Finder to any folder
-- Fast and reliable folder search using macOS Spotlight (mdfind)
+- Fast and reliable folder search using macOS Spotlight (`mdfind`)
 - Optimized search queries for better performance and relevance
 - Smart sorting of search results based on relevance and recency
 - Recently used folders for quick access
@@ -97,3 +97,7 @@ For reference, the `result` argument passed into the `appleScript` function is a
 ```
 
 You will likely only need/use the `path` property.
+
+## Credits
+
+This extension is based on the [Folder Search](https://www.raycast.com/GastroGeek/folder-search) extension originally created by [GastroGeek](https://www.raycast.com/GastroGeek). The folder searching functionality and plugin system were adapted from the original extension, while adding new capabilities for moving files.
