@@ -34,7 +34,6 @@ import {
   fixDoubleConcat,
 } from "./common/utils";
 
-// Interface for recent folders
 interface RecentFolder extends SpotlightSearchResult {
   lastUsed: Date;
 }
