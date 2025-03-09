@@ -13,6 +13,9 @@ import {
   getPreferenceValues,
   getSelectedFinderItems,
   Keyboard,
+  showHUD,
+  confirmAlert,
+  open,
 } from "@raycast/api";
 
 import { usePromise } from "@raycast/utils";
@@ -45,10 +48,43 @@ export default function Command() {
   const [canExecute, setCanExecute] = useState<boolean>(false);
   const [hasCheckedPreferences, setHasCheckedPreferences] = useState<boolean>(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [isShowingDetail, setIsShowingDetail] = useState<boolean>(false);
 
   const abortable = useRef<AbortController>();
   const preferences = getPreferenceValues<SpotlightSearchPreferences>();
   const maxRecentFolders = parseInt(preferences.maxRecentFolders || "10");
+
+  // Load user preferences
+  useEffect(() => {
+    async function loadUserPreferences() {
+      try {
+        const detailPreference = await LocalStorage.getItem(`${environment.extensionName}-show-details`);
+        if (detailPreference !== undefined) {
+          setIsShowingDetail(detailPreference === "true");
+        }
+      } catch (error) {
+        console.error("Error loading user preferences:", error);
+      }
+    }
+    
+    loadUserPreferences();
+  }, []);
+
+  // Save detail view preference when it changes
+  useEffect(() => {
+    async function saveDetailPreference() {
+      try {
+        await LocalStorage.setItem(`${environment.extensionName}-show-details`, isShowingDetail.toString());
+      } catch (error) {
+        console.error("Error saving detail preference:", error);
+      }
+    }
+    
+    // Only save after initial load
+    if (hasCheckedPreferences) {
+      saveDetailPreference();
+    }
+  }, [isShowingDetail, hasCheckedPreferences]);
 
   // Fix double text issue
   let fixedText = "";
@@ -206,13 +242,25 @@ export default function Command() {
           
           // Check if file already exists at destination
           if (fs.existsSync(destFilePath)) {
-            // Skip this file or implement a conflict resolution strategy
-            failCount++;
-            continue;
+            const overwrite = await confirmAlert({
+              title: "Overwrite the existing file?",
+              message: fileName + " already exists in " + destinationPath,
+            });
+
+            if (!overwrite) {
+              failCount++;
+              continue;
+            }
+            
+            if (filePath === destFilePath) {
+              await showHUD("The source and destination file are the same");
+              failCount++;
+              continue;
+            }
           }
           
           // Move the file
-          await fs.move(filePath, destFilePath);
+          await fs.move(filePath, destFilePath, { overwrite: true });
           successCount++;
         } catch (error) {
           console.error(`Error moving file ${filePath}:`, error);
@@ -251,6 +299,90 @@ export default function Command() {
       showToast({
         title: "Error",
         message: "Failed to move files",
+        style: Toast.Style.Failure,
+      });
+    }
+    
+    setIsLoading(false);
+  }
+
+  // Copy files to selected folder
+  async function copyFilesToFolder(destinationPath: string) {
+    setIsLoading(true);
+    
+    try {
+      // Verify destination folder exists
+      if (!fs.existsSync(destinationPath) || !fs.statSync(destinationPath).isDirectory()) {
+        throw new Error("Destination folder does not exist");
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const filePath of selectedFiles) {
+        try {
+          const fileName = path.basename(filePath);
+          const destFilePath = path.join(destinationPath, fileName);
+          
+          // Check if file already exists at destination
+          if (fs.existsSync(destFilePath)) {
+            const overwrite = await confirmAlert({
+              title: "Overwrite the existing file?",
+              message: fileName + " already exists in " + destinationPath,
+            });
+
+            if (!overwrite) {
+              failCount++;
+              continue;
+            }
+            
+            if (filePath === destFilePath) {
+              await showHUD("The source and destination file are the same");
+              failCount++;
+              continue;
+            }
+          }
+          
+          // Copy the file
+          await fs.copy(filePath, destFilePath, { overwrite: true });
+          successCount++;
+        } catch (error) {
+          console.error(`Error copying file ${filePath}:`, error);
+          failCount++;
+        }
+      }
+      
+      // Update recent folders with this destination
+      const destinationFolder = folders.find(f => f.path === destinationPath) || 
+                               recentFolders.find(f => f.path === destinationPath);
+      
+      if (destinationFolder) {
+        addToRecentFolders(destinationFolder);
+      }
+      
+      // Show success/failure toast
+      if (successCount > 0) {
+        showToast({
+          title: `Copied ${successCount} file${successCount !== 1 ? "s" : ""}`,
+          message: failCount > 0 ? `Failed to copy ${failCount} file${failCount !== 1 ? "s" : ""}` : "",
+          style: failCount > 0 ? Toast.Style.Failure : Toast.Style.Success,
+        });
+        
+        // Close the window after successful copy
+        popToRoot({ clearSearchBar: true });
+        closeMainWindow({ clearRootSearch: true });
+      } else {
+        showToast({
+          title: "Failed to copy files",
+          message: "No files were copied successfully",
+          style: Toast.Style.Failure,
+        });
+      }
+    } catch (error) {
+      console.error("Error copying files:", error);
+      showToast({
+        title: "Error",
+        message: "Failed to copy files",
         style: Toast.Style.Failure,
       });
     }
@@ -317,6 +449,7 @@ export default function Command() {
       searchBarPlaceholder="Search folders or navigate..."
       throttle
       navigationTitle={`Move ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""} to folder`}
+      isShowingDetail={isShowingDetail}
     >
       {selectedFiles.length > 0 && (
         <List.Section title="Selected Files">
@@ -350,9 +483,24 @@ export default function Command() {
             actions={
               <ActionPanel>
                 <Action
+                  title="Navigate to Folder"
+                  onAction={() => navigateToFolder(currentPath)}
+                />
+                <Action
                   title="Move Files Here"
-                  shortcut={{ modifiers: ["cmd"], key: "m" }}
+                  shortcut={{ modifiers: ["cmd"], key: "return" }}
                   onAction={() => moveFilesToFolder(currentPath)}
+                />
+                <Action
+                  title="Copy Files Here"
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                  onAction={() => copyFilesToFolder(currentPath)}
+                />
+                <Action
+                  title="Toggle Details"
+                  icon={Icon.Sidebar}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                  onAction={() => setIsShowingDetail(!isShowingDetail)}
                 />
               </ActionPanel>
             }
@@ -374,17 +522,56 @@ export default function Command() {
                   tooltip: folder.lastUsed ? `Last used: ${folder.lastUsed.toLocaleString()}` : "",
                 }
               ]}
+              detail={
+                <List.Item.Detail
+                  metadata={
+                    <List.Item.Detail.Metadata>
+                      <List.Item.Detail.Metadata.Label title="Metadata" />
+                      <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label
+                        title="Created"
+                        text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                      />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label
+                        title="Modified"
+                        text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                      />
+                      <List.Item.Detail.Metadata.Separator />
+                      <List.Item.Detail.Metadata.Label
+                        title="Last used"
+                        text={folder.lastUsed?.toLocaleString() || "-"}
+                      />
+                    </List.Item.Detail.Metadata>
+                  }
+                />
+              }
               actions={
                 <ActionPanel>
                   <Action
+                    title="Navigate to Folder"
+                    onAction={() => navigateToFolder(folder.path)}
+                  />
+                  <Action
                     title="Move Files Here"
-                    shortcut={{ modifiers: ["cmd"], key: "m" }}
+                    shortcut={{ modifiers: ["cmd"], key: "return" }}
                     onAction={() => moveFilesToFolder(folder.path)}
                   />
                   <Action
-                    title="Navigate to Folder"
-                    shortcut={{ modifiers: ["cmd"], key: "return" }}
-                    onAction={() => navigateToFolder(folder.path)}
+                    title="Copy Files Here"
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                    onAction={() => copyFilesToFolder(folder.path)}
+                  />
+                  <Action
+                    title="Toggle Details"
+                    icon={Icon.Sidebar}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                    onAction={() => setIsShowingDetail(!isShowingDetail)}
                   />
                 </ActionPanel>
               }
@@ -410,17 +597,56 @@ export default function Command() {
                   : "",
               }
             ]}
+            detail={
+              <List.Item.Detail
+                metadata={
+                  <List.Item.Detail.Metadata>
+                    <List.Item.Detail.Metadata.Label title="Metadata" />
+                    <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label
+                      title="Created"
+                      text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                    />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label
+                      title="Modified"
+                      text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                    />
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label
+                      title="Last used"
+                      text={folder.kMDItemLastUsedDate?.toLocaleString() || "-"}
+                    />
+                  </List.Item.Detail.Metadata>
+                }
+              />
+            }
             actions={
               <ActionPanel>
                 <Action
+                  title="Navigate to Folder"
+                  onAction={() => navigateToFolder(folder.path)}
+                />
+                <Action
                   title="Move Files Here"
-                  shortcut={{ modifiers: ["cmd"], key: "m" }}
+                  shortcut={{ modifiers: ["cmd"], key: "return" }}
                   onAction={() => moveFilesToFolder(folder.path)}
                 />
                 <Action
-                  title="Navigate to Folder"
-                  shortcut={{ modifiers: ["cmd"], key: "return" }}
-                  onAction={() => navigateToFolder(folder.path)}
+                  title="Copy Files Here"
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                  onAction={() => copyFilesToFolder(folder.path)}
+                />
+                <Action
+                  title="Toggle Details"
+                  icon={Icon.Sidebar}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                  onAction={() => setIsShowingDetail(!isShowingDetail)}
                 />
               </ActionPanel>
             }
