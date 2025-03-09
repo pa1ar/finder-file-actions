@@ -16,7 +16,6 @@ import {
   showHUD,
   confirmAlert,
   open,
-  LaunchProps,
 } from "@raycast/api";
 
 import { usePromise } from "@raycast/utils";
@@ -25,21 +24,21 @@ import { runAppleScript } from "run-applescript";
 import fs from "fs-extra";
 import path from "path";
 
-import { searchSpotlight } from "./common/search-spotlight";
-import { SpotlightSearchPreferences, SpotlightSearchResult } from "./common/types";
+import { searchSpotlight } from "../common/search-spotlight";
+import { SpotlightSearchPreferences, SpotlightSearchResult } from "../common/types";
 import {
   folderName,
   enclosingFolderName,
   lastUsedSort,
   fixDoubleConcat,
-} from "./common/utils";
+} from "../common/utils";
 
 // Interface for recent folders
 interface RecentFolder extends SpotlightSearchResult {
   lastUsed: Date;
 }
 
-export default function Command(props: LaunchProps) {
+export default function Command() {
   const [searchText, setSearchText] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [recentFolders, setRecentFolders] = useState<RecentFolder[]>([]);
@@ -50,7 +49,6 @@ export default function Command(props: LaunchProps) {
   const [hasCheckedPreferences, setHasCheckedPreferences] = useState<boolean>(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [isShowingDetail, setIsShowingDetail] = useState<boolean>(false);
-  const [isCopyMode, setIsCopyMode] = useState<boolean>(props?.arguments?.mode === "copy");
 
   const abortable = useRef<AbortController>();
   const preferences = getPreferenceValues<SpotlightSearchPreferences>();
@@ -444,18 +442,13 @@ export default function Command(props: LaunchProps) {
     }
   }
 
-  // Update the navigation title based on the mode
-  const navigationTitle = isCopyMode 
-    ? `Copy ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""} to folder`
-    : `Move ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""} to folder`;
-
   return (
     <List
       isLoading={isLoading || isQuerying}
       onSearchTextChange={setSearchText}
       searchBarPlaceholder="Search folders or navigate..."
       throttle
-      navigationTitle={navigationTitle}
+      navigationTitle={`Move ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""} to folder`}
       isShowingDetail={isShowingDetail}
     >
       {selectedFiles.length > 0 && (
@@ -494,14 +487,14 @@ export default function Command(props: LaunchProps) {
                   onAction={() => navigateToFolder(currentPath)}
                 />
                 <Action
-                  title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                  title="Move Files Here"
                   shortcut={{ modifiers: ["cmd"], key: "return" }}
-                  onAction={() => isCopyMode ? copyFilesToFolder(currentPath) : moveFilesToFolder(currentPath)}
+                  onAction={() => moveFilesToFolder(currentPath)}
                 />
                 <Action
-                  title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                  title="Copy Files Here"
                   shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                  onAction={() => isCopyMode ? moveFilesToFolder(currentPath) : copyFilesToFolder(currentPath)}
+                  onAction={() => copyFilesToFolder(currentPath)}
                 />
                 <Action
                   title="Toggle Details"
@@ -565,14 +558,14 @@ export default function Command(props: LaunchProps) {
                     onAction={() => navigateToFolder(folder.path)}
                   />
                   <Action
-                    title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                    title="Move Files Here"
                     shortcut={{ modifiers: ["cmd"], key: "return" }}
-                    onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
+                    onAction={() => moveFilesToFolder(folder.path)}
                   />
                   <Action
-                    title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                    title="Copy Files Here"
                     shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                    onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
+                    onAction={() => copyFilesToFolder(folder.path)}
                   />
                   <Action
                     title="Toggle Details"
@@ -640,14 +633,14 @@ export default function Command(props: LaunchProps) {
                   onAction={() => navigateToFolder(folder.path)}
                 />
                 <Action
-                  title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                  title="Move Files Here"
                   shortcut={{ modifiers: ["cmd"], key: "return" }}
-                  onAction={() => isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path)}
+                  onAction={() => moveFilesToFolder(folder.path)}
                 />
                 <Action
-                  title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                  title="Copy Files Here"
                   shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                  onAction={() => isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path)}
+                  onAction={() => copyFilesToFolder(folder.path)}
                 />
                 <Action
                   title="Toggle Details"

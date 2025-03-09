@@ -1,7 +1,7 @@
 import { getPreferenceValues } from "@raycast/api";
 import * as React from "react";
 
-import spotlight from "./libs/node-spotlight";
+import spotlight from "../libs/node-spotlight";
 import { SpotlightSearchPreferences, SpotlightSearchResult } from "./types";
 import { safeSearchScope } from "./utils";
 

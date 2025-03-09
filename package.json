@@ -1,12 +1,15 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "move-to-folder",
-  "title": "Move To Folder",
-  "description": "Move selected Finder files to a destination folder",
-  "icon": "move-to-folder.png",
+  "name": "finder-file-actions",
+  "title": "Finder File Actions",
+  "description": "Perform actions on selected Finder files",
+  "icon": "finder-file-actions.png",
   "keywords": [
+    "finder",
+    "files",
     "folders",
-    "search"
+    "move",
+    "copy"
   ],
   "author": "pa1ar",
   "contributors": [
@@ -21,7 +24,17 @@
       "name": "move-to-folder",
       "title": "Move to Folder",
       "description": "Move selected Finder files to a destination folder",
-      "mode": "view"
+      "mode": "view",
+      "path": "src/move-to-folder.tsx",
+      "icon": "move-to-folder.png"
+    },
+    {
+      "name": "copy-to-folder",
+      "title": "Copy to Folder",
+      "description": "Copy selected Finder files to a destination folder",
+      "mode": "view",
+      "path": "src/copy-to-folder.tsx",
+      "icon": "copy-to-folder.png"
     }
   ],
   "preferences": [
