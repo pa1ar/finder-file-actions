@@ -1,4 +1,4 @@
-import { LaunchProps, launchCommand } from "@raycast/api";
+import { LaunchProps, launchCommand, LaunchType } from "@raycast/api";
 import { useEffect } from "react";
 
 export default function Command(props: LaunchProps) {
@@ -6,7 +6,7 @@ export default function Command(props: LaunchProps) {
     // Launch the move-to-folder command with copy mode
     launchCommand({
       name: "move-to-folder",
-      type: "command",
+      type: LaunchType.UserInitiated,
       arguments: {
         mode: "copy"
       }

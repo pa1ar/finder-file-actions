@@ -51,6 +51,8 @@ export default function Command(props: LaunchProps) {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [isShowingDetail, setIsShowingDetail] = useState<boolean>(false);
   const [isCopyMode, setIsCopyMode] = useState<boolean>(props?.arguments?.mode === "copy");
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
+  const [searchResultsKey, setSearchResultsKey] = useState<number>(0);
 
   const abortable = useRef<AbortController>();
   const preferences = getPreferenceValues<SpotlightSearchPreferences>();
@@ -216,6 +218,8 @@ export default function Command(props: LaunchProps) {
       onWillExecute: () => {
         setIsQuerying(true);
         setCanExecute(false);
+        // Clear folders when starting a new search
+        setFolders([]);
       },
       onData: () => {
         setIsQuerying(false);
@@ -244,6 +248,14 @@ export default function Command(props: LaunchProps) {
       setCanExecute(true);
     })();
   }, [searchText]);
+
+  // Add a useEffect to focus the first search result when search text changes
+  useEffect(() => {
+    if (searchText && folders.length > 0) {
+      // Focus the first search result
+      setSelectedItemId(folders[0].path);
+    }
+  }, [searchText, folders]);
 
   // Move files to selected folder
   async function moveFilesToFolder(destinationPath: string) {
@@ -481,8 +493,21 @@ export default function Command(props: LaunchProps) {
     if (currentPath && fs.existsSync(currentPath)) {
       const folderContents = loadFolderContents(currentPath);
       setFolders(folderContents);
+      // Select the first folder if available
+      if (folderContents.length > 0) {
+        setSelectedItemId(folderContents[0].path);
+      }
     }
   }, [currentPath]);
+
+  // Reset selection when search results change
+  useEffect(() => {
+    if (folders.length > 0) {
+      setSelectedItemId(folders[0].path);
+    } else {
+      setSelectedItemId(undefined);
+    }
+  }, [folders]);
 
   // Navigate to a folder (for browsing)
   function navigateToFolder(folderPath: string) {
@@ -532,6 +557,7 @@ export default function Command(props: LaunchProps) {
       throttle
       navigationTitle={navigationTitle}
       isShowingDetail={isShowingDetail}
+      selectedItemId={selectedItemId}
     >
       {selectedFiles.length > 0 && (
         <List.Section title="Selected Files">
@@ -594,6 +620,7 @@ export default function Command(props: LaunchProps) {
         {folders.map((folder) => (
           <List.Item
             key={folder.path}
+            id={folder.path}
             title={folderName(folder)}
             subtitle={folder.path}
             icon={Icon.Folder}
@@ -669,6 +696,7 @@ export default function Command(props: LaunchProps) {
           {recentFolders.map((folder) => (
             <List.Item
               key={folder.path}
+              id={folder.path}
               title={folderName(folder)}
               subtitle={folder.path}
               icon={Icon.Clock}
