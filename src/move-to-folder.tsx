@@ -297,7 +297,7 @@ export default function Command(props: LaunchProps) {
   useEffect(() => {
     if (searchText && folders.length > 0) {
       // Focus the first search result
-      setSelectedItemId(folders[0].path);
+      setSelectedItemId(`subfolder-${folders[0].path}`);
     }
   }, [searchText, folders]);
 
@@ -364,6 +364,24 @@ export default function Command(props: LaunchProps) {
       
       if (destinationFolder) {
         addToRecentFolders(destinationFolder);
+      } else if (destinationPath === currentPath) {
+        // If the destination is the current navigation path, add it to recent folders
+        // First check if the folder exists
+        if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).isDirectory()) {
+          // Create a minimal folder object with just the required path
+          const navFolder: SpotlightSearchResult = {
+            path: destinationPath,
+            kMDItemFSName: path.basename(destinationPath),
+            kMDItemKind: "Folder",
+            kMDItemFSSize: 0,
+            kMDItemFSCreationDate: new Date(),
+            kMDItemContentModificationDate: new Date(),
+            kMDItemLastUsedDate: new Date(),
+            kMDItemUseCount: 0,
+          };
+          
+          addToRecentFolders(navFolder);
+        }
       }
       
       // Show success/failure toast
@@ -459,6 +477,24 @@ export default function Command(props: LaunchProps) {
       
       if (destinationFolder) {
         addToRecentFolders(destinationFolder);
+      } else if (destinationPath === currentPath) {
+        // If the destination is the current navigation path, add it to recent folders
+        // First check if the folder exists
+        if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).isDirectory()) {
+          // Create a minimal folder object with just the required path
+          const navFolder: SpotlightSearchResult = {
+            path: destinationPath,
+            kMDItemFSName: path.basename(destinationPath),
+            kMDItemKind: "Folder",
+            kMDItemFSSize: 0,
+            kMDItemFSCreationDate: new Date(),
+            kMDItemContentModificationDate: new Date(),
+            kMDItemLastUsedDate: new Date(),
+            kMDItemUseCount: 0,
+          };
+          
+          addToRecentFolders(navFolder);
+        }
       }
       
       // Show success/failure toast
@@ -539,7 +575,7 @@ export default function Command(props: LaunchProps) {
       setFolders(folderContents);
       // Select the first folder if available
       if (folderContents.length > 0) {
-        setSelectedItemId(folderContents[0].path);
+        setSelectedItemId(`subfolder-${folderContents[0].path}`);
       }
     }
   }, [currentPath]);
@@ -547,7 +583,7 @@ export default function Command(props: LaunchProps) {
   // Reset selection when search results change
   useEffect(() => {
     if (folders.length > 0) {
-      setSelectedItemId(folders[0].path);
+      setSelectedItemId(`subfolder-${folders[0].path}`);
     } else {
       setSelectedItemId(undefined);
     }
@@ -684,7 +720,7 @@ export default function Command(props: LaunchProps) {
             {folders.map((folder) => (
               <List.Item
                 key={folder.path}
-                id={folder.path}
+                id={`subfolder-${folder.path}`}
                 title={folderName(folder)}
                 subtitle={folder.path}
                 icon={Icon.Folder}
@@ -766,7 +802,7 @@ export default function Command(props: LaunchProps) {
               {recentFolders.map((folder) => (
                 <List.Item
                   key={folder.path}
-                  id={folder.path}
+                  id={`recent-${folder.path}`}
                   title={folderName(folder)}
                   subtitle={folder.path}
                   icon={Icon.Clock}

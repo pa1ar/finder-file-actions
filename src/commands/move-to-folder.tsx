@@ -49,6 +49,7 @@ export default function Command() {
   const [hasCheckedPreferences, setHasCheckedPreferences] = useState<boolean>(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [isShowingDetail, setIsShowingDetail] = useState<boolean>(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
 
   const abortable = useRef<AbortController>();
   const preferences = getPreferenceValues<SpotlightSearchPreferences>();
@@ -293,6 +294,24 @@ export default function Command() {
       
       if (destinationFolder) {
         addToRecentFolders(destinationFolder);
+      } else if (destinationPath === currentPath) {
+        // If the destination is the current navigation path, add it to recent folders
+        // First check if the folder exists
+        if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).isDirectory()) {
+          // Create a minimal folder object with just the required path
+          const navFolder: SpotlightSearchResult = {
+            path: destinationPath,
+            kMDItemFSName: path.basename(destinationPath),
+            kMDItemKind: "Folder",
+            kMDItemFSSize: 0,
+            kMDItemFSCreationDate: new Date(),
+            kMDItemContentModificationDate: new Date(),
+            kMDItemLastUsedDate: new Date(),
+            kMDItemUseCount: 0,
+          };
+          
+          addToRecentFolders(navFolder);
+        }
       }
       
       // Show success/failure toast
@@ -377,6 +396,24 @@ export default function Command() {
       
       if (destinationFolder) {
         addToRecentFolders(destinationFolder);
+      } else if (destinationPath === currentPath) {
+        // If the destination is the current navigation path, add it to recent folders
+        // First check if the folder exists
+        if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).isDirectory()) {
+          // Create a minimal folder object with just the required path
+          const navFolder: SpotlightSearchResult = {
+            path: destinationPath,
+            kMDItemFSName: path.basename(destinationPath),
+            kMDItemKind: "Folder",
+            kMDItemFSSize: 0,
+            kMDItemFSCreationDate: new Date(),
+            kMDItemContentModificationDate: new Date(),
+            kMDItemLastUsedDate: new Date(),
+            kMDItemUseCount: 0,
+          };
+          
+          addToRecentFolders(navFolder);
+        }
       }
       
       // Show success/failure toast
@@ -443,6 +480,10 @@ export default function Command() {
       }
       
       setFolders(folderContents.sort((a, b) => a.kMDItemFSName.localeCompare(b.kMDItemFSName)));
+      // Select the first folder if available
+      if (folderContents.length > 0) {
+        setSelectedItemId(`subfolder-${folderContents[0].path}`);
+      }
     } catch (error) {
       console.error(`Error reading folder ${folderPath}:`, error);
       showToast({
@@ -461,6 +502,15 @@ export default function Command() {
     }
   }
 
+  // Reset selection when search results change
+  useEffect(() => {
+    if (folders.length > 0) {
+      setSelectedItemId(`subfolder-${folders[0].path}`);
+    } else {
+      setSelectedItemId(undefined);
+    }
+  }, [folders]);
+
   return (
     <List
       isLoading={isLoading || isQuerying}
@@ -469,6 +519,7 @@ export default function Command() {
       throttle
       navigationTitle={`Move ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""} to folder`}
       isShowingDetail={isShowingDetail}
+      selectedItemId={selectedItemId}
     >
       {selectedFiles.length > 0 && (
         <List.Section title="Selected Files">
@@ -532,6 +583,7 @@ export default function Command() {
           {recentFolders.map((folder) => (
             <List.Item
               key={folder.path}
+              id={`recent-${folder.path}`}
               title={folderName(folder)}
               subtitle={folder.path}
               icon={Icon.Clock}
@@ -609,6 +661,7 @@ export default function Command() {
         {folders.map((folder) => (
           <List.Item
             key={folder.path}
+            id={`subfolder-${folder.path}`}
             title={folderName(folder)}
             subtitle={folder.path}
             icon={Icon.Folder}
