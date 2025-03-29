@@ -681,21 +681,21 @@ export default function Command(props: LaunchProps) {
               <List.Item
                 title={path.basename(currentPath)}
                 subtitle={currentPath}
-                icon={Icon.Folder}
+                icon={Icon.Footprints}
                 actions={
                   <ActionPanel>
-                    <Action title="Navigate to Folder" onAction={() => navigateToFolder(currentPath)} icon={Icon.Folder} />
+                    <Action title="Navigate to Folder" onAction={() => navigateToFolder(currentPath)} icon={Icon.Footprints} />
                     <Action
                       title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
                       shortcut={{ modifiers: ["cmd"], key: "return" }}
                       onAction={() => (isCopyMode ? copyFilesToFolder(currentPath) : moveFilesToFolder(currentPath))}
-                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRight}
+                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
                     />
                     <Action
                       title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
                       shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
                       onAction={() => (isCopyMode ? moveFilesToFolder(currentPath) : copyFilesToFolder(currentPath))}
-                      icon={isCopyMode ? Icon.ArrowRight : Icon.Duplicate}
+                      icon={isCopyMode ? Icon.ArrowRightCircle : Icon.Duplicate}
                     />
                     <Action
                       title="Toggle Details"
@@ -716,7 +716,7 @@ export default function Command(props: LaunchProps) {
                 id={`subfolder-${folder.path}`}
                 title={folderName(folder)}
                 subtitle={folder.path}
-                icon={Icon.Folder}
+                icon={Icon.Footprints}
                 accessories={[
                   {
                     text: folder.kMDItemContentModificationDate
@@ -758,18 +758,18 @@ export default function Command(props: LaunchProps) {
                 }
                 actions={
                   <ActionPanel>
-                    <Action title="Navigate to Folder" onAction={() => navigateToFolder(folder.path)} icon={Icon.Folder} />
+                    <Action title="Navigate to Folder" onAction={() => navigateToFolder(folder.path)} icon={Icon.Footprints} />
                     <Action
                       title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
                       shortcut={{ modifiers: ["cmd"], key: "return" }}
                       onAction={() => (isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path))}
-                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRight}
+                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
                     />
                     <Action
                       title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
                       shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
                       onAction={() => (isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path))}
-                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRight}
+                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
                     />
                     <Action
                       title="Toggle Details"
@@ -836,18 +836,18 @@ export default function Command(props: LaunchProps) {
                   }
                   actions={
                     <ActionPanel>
-                      <Action title="Navigate to Folder" onAction={() => navigateToFolder(folder.path)} icon={Icon.Folder} />
+                      <Action title="Navigate to Folder" onAction={() => navigateToFolder(folder.path)} icon={Icon.Footprints} />
                       <Action
                         title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
                         shortcut={{ modifiers: ["cmd"], key: "return" }}
                         onAction={() => (isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path))}
-                        icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRight}
+                        icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
                       />
                       <Action
                         title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
                         shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
                         onAction={() => (isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path))}
-                        icon={isCopyMode ? Icon.ArrowRight : Icon.Duplicate}
+                        icon={isCopyMode ? Icon.ArrowRightCircle : Icon.Duplicate}
                       />
                       <Action
                         title="Toggle Details"
