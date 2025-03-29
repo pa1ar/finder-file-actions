@@ -684,7 +684,11 @@ export default function Command(props: LaunchProps) {
                 icon={Icon.Footprints}
                 actions={
                   <ActionPanel>
-                    <Action title="Navigate to Folder" onAction={() => navigateToFolder(currentPath)} icon={Icon.Footprints} />
+                    <Action
+                      title="Navigate to Folder"
+                      onAction={() => navigateToFolder(currentPath)}
+                      icon={Icon.Footprints}
+                    />
                     <Action
                       title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
                       shortcut={{ modifiers: ["cmd"], key: "return" }}
@@ -758,7 +762,11 @@ export default function Command(props: LaunchProps) {
                 }
                 actions={
                   <ActionPanel>
-                    <Action title="Navigate to Folder" onAction={() => navigateToFolder(folder.path)} icon={Icon.Footprints} />
+                    <Action
+                      title="Navigate to Folder"
+                      onAction={() => navigateToFolder(folder.path)}
+                      icon={Icon.Footprints}
+                    />
                     <Action
                       title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
                       shortcut={{ modifiers: ["cmd"], key: "return" }}
@@ -836,7 +844,11 @@ export default function Command(props: LaunchProps) {
                   }
                   actions={
                     <ActionPanel>
-                      <Action title="Navigate to Folder" onAction={() => navigateToFolder(folder.path)} icon={Icon.Footprints} />
+                      <Action
+                        title="Navigate to Folder"
+                        onAction={() => navigateToFolder(folder.path)}
+                        icon={Icon.Footprints}
+                      />
                       <Action
                         title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
                         shortcut={{ modifiers: ["cmd"], key: "return" }}
