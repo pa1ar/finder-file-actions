@@ -248,8 +248,8 @@ export default function Command(props: LaunchProps) {
       searchText,
       currentPath || "",
       abortable,
-      (result: SpotlightSearchResult) => {
-        setFolders((folders) => [result, ...folders].sort(lastUsedSort));
+      (results: SpotlightSearchResult[]) => {
+        setFolders(results.sort(lastUsedSort));
       },
     ],
     {
@@ -291,7 +291,7 @@ export default function Command(props: LaunchProps) {
   useEffect(() => {
     if (searchText && folders.length > 0) {
       // Focus the first search result
-      setSelectedItemId(`subfolder-${folders[0].path}`);
+      setSelectedItemId(`subfolder-${folders[0].path}-0`);
     }
   }, [searchText, folders]);
 
@@ -537,6 +537,7 @@ export default function Command(props: LaunchProps) {
             folderContents.push({
               path: itemPath,
               kMDItemFSName: item,
+              kMDItemDisplayName: item,
               kMDItemKind: "Folder",
               kMDItemFSSize: 0,
               kMDItemFSCreationDate: stats.birthtime,
@@ -569,7 +570,7 @@ export default function Command(props: LaunchProps) {
       setFolders(folderContents);
       // Select the first folder if available
       if (folderContents.length > 0) {
-        setSelectedItemId(`subfolder-${folderContents[0].path}`);
+        setSelectedItemId(`subfolder-${folderContents[0].path}-0`);
       }
     }
   }, [currentPath]);
@@ -577,7 +578,7 @@ export default function Command(props: LaunchProps) {
   // Reset selection when search results change
   useEffect(() => {
     if (folders.length > 0) {
-      setSelectedItemId(`subfolder-${folders[0].path}`);
+      setSelectedItemId(`subfolder-${folders[0].path}-0`);
     } else {
       setSelectedItemId(undefined);
     }
@@ -699,7 +700,7 @@ export default function Command(props: LaunchProps) {
                       title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
                       shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
                       onAction={() => (isCopyMode ? moveFilesToFolder(currentPath) : copyFilesToFolder(currentPath))}
-                      icon={isCopyMode ? Icon.ArrowRightCircle : Icon.Duplicate}
+                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
                     />
                     <Action
                       title="Toggle Details"
@@ -714,10 +715,10 @@ export default function Command(props: LaunchProps) {
           )}
 
           <List.Section title={currentPath ? "Subfolders" : searchText ? "Search Results" : "Search for a folder"}>
-            {folders.map((folder) => (
+            {folders.map((folder, index) => (
               <List.Item
-                key={folder.path}
-                id={`subfolder-${folder.path}`}
+                key={`subfolder-${folder.path}-${index}`}
+                id={`subfolder-${folder.path}-${index}`}
                 title={folderName(folder)}
                 subtitle={folder.path}
                 icon={Icon.Folder}
@@ -800,10 +801,10 @@ export default function Command(props: LaunchProps) {
 
           {!searchText && recentFolders.length > 0 && (
             <List.Section title="Recent Folders">
-              {recentFolders.map((folder) => (
+              {recentFolders.map((folder, index) => (
                 <List.Item
-                  key={folder.path}
-                  id={`recent-${folder.path}`}
+                  key={`recent-${folder.path}-${index}`}
+                  id={`recent-${folder.path}-${index}`}
                   title={folderName(folder)}
                   subtitle={folder.path}
                   icon={Icon.Clock}

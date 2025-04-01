@@ -8,6 +8,7 @@ type SpotlightSearchDefinition = string[];
 type SpotlightSearchResult = {
   path: string;
   kMDItemFSName: string;
+  kMDItemDisplayName?: string;
   kMDItemKind: string;
   kMDItemFSSize: number;
   kMDItemFSCreationDate: Date;
