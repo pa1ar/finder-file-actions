@@ -31,31 +31,3 @@ export const createTestFolderStructure = async (baseDir: string) => {
     testFile: path.join(baseDir, "TestFolder1", "test.txt"),
   };
 };
-
-export const setupTestEnvironment = async () => {
-  const testDir = await createTestDirectory();
-  const sourceDir = path.join(testDir, "source");
-  const destDir = path.join(testDir, "dest");
-  const readOnlyDir = path.join(testDir, "readonly");
-
-  await fs.mkdir(sourceDir);
-  await fs.mkdir(destDir);
-  await fs.mkdir(readOnlyDir);
-
-  // Create test files
-  await fs.writeFile(path.join(sourceDir, "test1.txt"), "test content 1");
-  await fs.writeFile(path.join(sourceDir, "test2.txt"), "test content 2");
-  await fs.writeFile(path.join(sourceDir, "test3.txt"), "test content 3");
-
-  // Create a readonly directory
-  await fs.chmod(readOnlyDir, 0o444);
-
-  return testDir;
-};
-
-export const cleanupTestEnvironment = async (testDir: string) => {
-  // Reset permissions before cleanup
-  const readOnlyDir = path.join(testDir, "readonly");
-  await fs.chmod(readOnlyDir, 0o777).catch(() => {});
-  await cleanupTestDirectory(testDir);
-};

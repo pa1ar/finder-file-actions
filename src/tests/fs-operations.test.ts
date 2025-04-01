@@ -4,12 +4,10 @@ import fs from "fs-extra";
 import { createTestDirectory, cleanupTestDirectory, createTestFolderStructure } from "./utils/test-helpers";
 
 interface TestStructure {
-  baseDir: string;
-  testFolder1: string;
-  testFolder2: string;
-  subFolder1: string;
-  specialFolder: string;
-  testFile: string;
+  [key: string]: {
+    type: "file" | "directory";
+    content?: string;
+  };
 }
 
 describe("File System Operations", () => {
