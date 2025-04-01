@@ -1,11 +1,11 @@
-type SpotlightSearchPreferences = {
+export interface SpotlightSearchPreferences {
   maxResults: number;
   maxRecentFolders: string;
-};
+}
 
-type SpotlightSearchDefinition = string[];
+export interface SpotlightSearchDefinition extends Array<string> {}
 
-type SpotlightSearchResult = {
+export interface SpotlightSearchResult {
   path: string;
   kMDItemFSName: string;
   kMDItemDisplayName?: string;
@@ -15,6 +15,9 @@ type SpotlightSearchResult = {
   kMDItemContentModificationDate: Date;
   kMDItemLastUsedDate: Date;
   kMDItemUseCount: number;
-};
+}
 
-export type { SpotlightSearchPreferences, SpotlightSearchDefinition, SpotlightSearchResult };
+export interface PinnedFolder extends SpotlightSearchResult {
+  pinnedAt: Date;
+  lastVerified: Date;
+}

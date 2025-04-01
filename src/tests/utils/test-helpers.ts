@@ -3,13 +3,17 @@ import path from "path";
 import os from "os";
 
 export const createTestDirectory = async () => {
-  const testDir = path.join(os.tmpdir(), `raycast-test-${Date.now()}`);
+  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await fs.mkdir(testDir);
   return testDir;
 };
 
-export const cleanupTestDirectory = async (dir: string) => {
-  await fs.remove(dir);
+export const cleanupTestDirectory = async (testDir: string) => {
+  try {
+    await fs.rm(testDir, { recursive: true, force: true });
+  } catch (error) {
+    console.error(`Error cleaning up test directory ${testDir}:`, error);
+  }
 };
 
 export const createTestFolderStructure = async (baseDir: string) => {

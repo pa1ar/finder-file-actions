@@ -23,9 +23,10 @@ import fs from "fs-extra";
 import path from "path";
 
 import { searchSpotlight } from "./common/search-spotlight";
-import { SpotlightSearchPreferences, SpotlightSearchResult } from "./common/types";
+import { SpotlightSearchPreferences, SpotlightSearchResult, PinnedFolder } from "./common/types";
 import { folderName, lastUsedSort, fixDoubleConcat } from "./common/utils";
 import { fsAsync } from "./common/fs-async";
+import { CacheManager } from "./common/cache-manager";
 
 interface RecentFolder extends SpotlightSearchResult {
   lastUsed: Date;
@@ -35,6 +36,7 @@ export default function Command(props: LaunchProps) {
   const [searchText, setSearchText] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [recentFolders, setRecentFolders] = useState<RecentFolder[]>([]);
+  const [pinnedFolders, setPinnedFolders] = useState<PinnedFolder[]>([]);
   const [folders, setFolders] = useState<SpotlightSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isQuerying, setIsQuerying] = useState<boolean>(false);
@@ -49,6 +51,7 @@ export default function Command(props: LaunchProps) {
   const abortable = useRef<AbortController>();
   const preferences = getPreferenceValues<SpotlightSearchPreferences>();
   const maxRecentFolders = parseInt(preferences.maxRecentFolders || "10");
+  const cacheManager = CacheManager.getInstance();
 
   // Function to check if Finder is the frontmost application
   async function isFinderFrontmost() {
@@ -384,7 +387,7 @@ export default function Command(props: LaunchProps) {
       results.forEach((result) => {
         if (result.success) {
           successCount++;
-        } else if (!result.skipped) {
+        } else if (!("skipped" in result && result.skipped)) {
           failCount++;
         }
       });
@@ -532,7 +535,7 @@ export default function Command(props: LaunchProps) {
       results.forEach((result) => {
         if (result.success) {
           successCount++;
-        } else if ("skipped" in result && !result.skipped) {
+        } else if (!("skipped" in result && result.skipped)) {
           failCount++;
         }
       });
@@ -690,6 +693,58 @@ export default function Command(props: LaunchProps) {
     }
   }
 
+  // Load pinned folders
+  useEffect(() => {
+    loadPinnedFolders();
+  }, []);
+
+  async function loadPinnedFolders() {
+    try {
+      const folders = await cacheManager.getPinnedFolders();
+      setPinnedFolders(folders);
+    } catch (error) {
+      console.error("Error loading pinned folders:", error);
+    }
+  }
+
+  async function pinFolder(folder: SpotlightSearchResult) {
+    try {
+      await cacheManager.pinFolder(folder);
+      await loadPinnedFolders();
+      showToast({
+        style: Toast.Style.Success,
+        title: "Folder Pinned",
+        message: folderName(folder),
+      });
+    } catch (error) {
+      console.error("Error pinning folder:", error);
+      showToast({
+        style: Toast.Style.Failure,
+        title: "Error",
+        message: "Failed to pin folder",
+      });
+    }
+  }
+
+  async function unpinFolder(folder: SpotlightSearchResult) {
+    try {
+      await cacheManager.unpinFolder(folder.path);
+      await loadPinnedFolders();
+      showToast({
+        style: Toast.Style.Success,
+        title: "Folder Unpinned",
+        message: folderName(folder),
+      });
+    } catch (error) {
+      console.error("Error unpinning folder:", error);
+      showToast({
+        style: Toast.Style.Failure,
+        title: "Error",
+        message: "Failed to unpin folder",
+      });
+    }
+  }
+
   // Update the navigation title based on the mode
   const navigationTitle = isCopyMode
     ? `Copy ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""} to folder`
@@ -785,6 +840,94 @@ export default function Command(props: LaunchProps) {
             </List.Section>
           )}
 
+          {!searchText && pinnedFolders.length > 0 && (
+            <List.Section title="Pinned Folders">
+              {pinnedFolders.map((folder, index) => (
+                <List.Item
+                  key={`pinned-${folder.path}-${index}`}
+                  id={`pinned-${folder.path}-${index}`}
+                  title={folderName(folder)}
+                  subtitle={folder.path}
+                  icon={Icon.Star}
+                  accessories={[
+                    {
+                      text: folder.pinnedAt ? `Pinned: ${folder.pinnedAt.toLocaleDateString()}` : "",
+                      tooltip: folder.pinnedAt ? `Pinned: ${folder.pinnedAt.toLocaleString()}` : "",
+                    },
+                  ]}
+                  detail={
+                    <List.Item.Detail
+                      metadata={
+                        <List.Item.Detail.Metadata>
+                          <List.Item.Detail.Metadata.Label title="Metadata" />
+                          <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Created"
+                            text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                          />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Modified"
+                            text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                          />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Last used"
+                            text={folder.kMDItemLastUsedDate?.toLocaleString() || "-"}
+                          />
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.Label
+                            title="Pinned"
+                            text={folder.pinnedAt?.toLocaleString() || "-"}
+                          />
+                        </List.Item.Detail.Metadata>
+                      }
+                    />
+                  }
+                  actions={
+                    <ActionPanel>
+                      <Action
+                        title="Navigate to Folder"
+                        onAction={() => navigateToFolder(folder.path)}
+                        icon={Icon.ChevronRight}
+                      />
+                      <Action
+                        title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                        shortcut={{ modifiers: ["cmd"], key: "return" }}
+                        onAction={() => (isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path))}
+                        icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
+                      />
+                      <Action
+                        title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                        onAction={() => (isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path))}
+                        icon={isCopyMode ? Icon.ArrowRightCircle : Icon.Duplicate}
+                      />
+                      <Action
+                        title="Toggle Details"
+                        icon={Icon.Sidebar}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                        onAction={() => setIsShowingDetail(!isShowingDetail)}
+                      />
+                      <Action
+                        icon={Icon.StarDisabled}
+                        style={Action.Style.Destructive}
+                        title="Unpin This Folder"
+                        onAction={() => unpinFolder(folder)}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "u" }}
+                      />
+                    </ActionPanel>
+                  }
+                />
+              ))}
+            </List.Section>
+          )}
+
           <List.Section title={currentPath ? "Subfolders" : searchText ? "Search Results" : "Search for a folder"}>
             {folders.map((folder, index) => (
               <List.Item
@@ -858,11 +1001,10 @@ export default function Command(props: LaunchProps) {
                       onAction={() => setIsShowingDetail(!isShowingDetail)}
                     />
                     <Action
-                      icon={Icon.Trash}
-                      style={Action.Style.Destructive}
-                      title="Remove This Recent Folder"
-                      onAction={() => removeFromRecentFolders(folder.path)}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
+                      icon={Icon.Star}
+                      title="Pin This Folder"
+                      onAction={() => pinFolder(folder)}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
                     />
                   </ActionPanel>
                 }
@@ -938,6 +1080,12 @@ export default function Command(props: LaunchProps) {
                         icon={Icon.Sidebar}
                         shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
                         onAction={() => setIsShowingDetail(!isShowingDetail)}
+                      />
+                      <Action
+                        icon={Icon.Star}
+                        title="Pin This Folder"
+                        onAction={() => pinFolder(folder)}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
                       />
                       <Action
                         icon={Icon.Trash}
