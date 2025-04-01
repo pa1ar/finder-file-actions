@@ -840,6 +840,90 @@ export default function Command(props: LaunchProps) {
             </List.Section>
           )}
 
+          <List.Section title={currentPath ? "Subfolders" : searchText ? "Search Results" : "Search for a folder"}>
+            {folders.map((folder, index) => (
+              <List.Item
+                key={`subfolder-${folder.path}-${index}`}
+                id={`subfolder-${folder.path}-${index}`}
+                title={folderName(folder)}
+                subtitle={folder.path}
+                icon={Icon.Folder}
+                accessories={[
+                  {
+                    text: folder.kMDItemContentModificationDate
+                      ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleDateString()}`
+                      : "",
+                    tooltip: folder.kMDItemContentModificationDate
+                      ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleString()}`
+                      : "",
+                  },
+                ]}
+                detail={
+                  <List.Item.Detail
+                    metadata={
+                      <List.Item.Detail.Metadata>
+                        <List.Item.Detail.Metadata.Label title="Metadata" />
+                        <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Created"
+                          text={folder.kMDItemFSCreationDate?.toLocaleString()}
+                        />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Modified"
+                          text={folder.kMDItemContentModificationDate?.toLocaleString()}
+                        />
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.Label
+                          title="Last used"
+                          text={folder.kMDItemLastUsedDate?.toLocaleString() || "-"}
+                        />
+                      </List.Item.Detail.Metadata>
+                    }
+                  />
+                }
+                actions={
+                  <ActionPanel>
+                    <Action
+                      title="Navigate to Folder"
+                      onAction={() => navigateToFolder(folder.path)}
+                      icon={Icon.ChevronRight}
+                    />
+                    <Action
+                      title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
+                      shortcut={{ modifiers: ["cmd"], key: "return" }}
+                      onAction={() => (isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path))}
+                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
+                    />
+                    <Action
+                      title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
+                      onAction={() => (isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path))}
+                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
+                    />
+                    <Action
+                      title="Toggle Details"
+                      icon={Icon.Sidebar}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
+                      onAction={() => setIsShowingDetail(!isShowingDetail)}
+                    />
+                    <Action
+                      icon={Icon.Star}
+                      title="Pin This Folder"
+                      onAction={() => pinFolder(folder)}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+                    />
+                  </ActionPanel>
+                }
+              />
+            ))}
+          </List.Section>
+
           {!searchText && pinnedFolders.length > 0 && (
             <List.Section title="Pinned Folders">
               {pinnedFolders.map((folder, index) => (
@@ -927,90 +1011,6 @@ export default function Command(props: LaunchProps) {
               ))}
             </List.Section>
           )}
-
-          <List.Section title={currentPath ? "Subfolders" : searchText ? "Search Results" : "Search for a folder"}>
-            {folders.map((folder, index) => (
-              <List.Item
-                key={`subfolder-${folder.path}-${index}`}
-                id={`subfolder-${folder.path}-${index}`}
-                title={folderName(folder)}
-                subtitle={folder.path}
-                icon={Icon.Folder}
-                accessories={[
-                  {
-                    text: folder.kMDItemContentModificationDate
-                      ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleDateString()}`
-                      : "",
-                    tooltip: folder.kMDItemContentModificationDate
-                      ? `Modified: ${folder.kMDItemContentModificationDate.toLocaleString()}`
-                      : "",
-                  },
-                ]}
-                detail={
-                  <List.Item.Detail
-                    metadata={
-                      <List.Item.Detail.Metadata>
-                        <List.Item.Detail.Metadata.Label title="Metadata" />
-                        <List.Item.Detail.Metadata.Label title="Name" text={folder.kMDItemFSName} />
-                        <List.Item.Detail.Metadata.Separator />
-                        <List.Item.Detail.Metadata.Label title="Where" text={folder.path} />
-                        <List.Item.Detail.Metadata.Separator />
-                        <List.Item.Detail.Metadata.Label title="Type" text={folder.kMDItemKind} />
-                        <List.Item.Detail.Metadata.Separator />
-                        <List.Item.Detail.Metadata.Label
-                          title="Created"
-                          text={folder.kMDItemFSCreationDate?.toLocaleString()}
-                        />
-                        <List.Item.Detail.Metadata.Separator />
-                        <List.Item.Detail.Metadata.Label
-                          title="Modified"
-                          text={folder.kMDItemContentModificationDate?.toLocaleString()}
-                        />
-                        <List.Item.Detail.Metadata.Separator />
-                        <List.Item.Detail.Metadata.Label
-                          title="Last used"
-                          text={folder.kMDItemLastUsedDate?.toLocaleString() || "-"}
-                        />
-                      </List.Item.Detail.Metadata>
-                    }
-                  />
-                }
-                actions={
-                  <ActionPanel>
-                    <Action
-                      title="Navigate to Folder"
-                      onAction={() => navigateToFolder(folder.path)}
-                      icon={Icon.ChevronRight}
-                    />
-                    <Action
-                      title={isCopyMode ? "Copy Files Here" : "Move Files Here"}
-                      shortcut={{ modifiers: ["cmd"], key: "return" }}
-                      onAction={() => (isCopyMode ? copyFilesToFolder(folder.path) : moveFilesToFolder(folder.path))}
-                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
-                    />
-                    <Action
-                      title={isCopyMode ? "Move Files Here" : "Copy Files Here"}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-                      onAction={() => (isCopyMode ? moveFilesToFolder(folder.path) : copyFilesToFolder(folder.path))}
-                      icon={isCopyMode ? Icon.Duplicate : Icon.ArrowRightCircle}
-                    />
-                    <Action
-                      title="Toggle Details"
-                      icon={Icon.Sidebar}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
-                      onAction={() => setIsShowingDetail(!isShowingDetail)}
-                    />
-                    <Action
-                      icon={Icon.Star}
-                      title="Pin This Folder"
-                      onAction={() => pinFolder(folder)}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
-                    />
-                  </ActionPanel>
-                }
-              />
-            ))}
-          </List.Section>
 
           {!searchText && recentFolders.length > 0 && (
             <List.Section title="Recent Folders">
