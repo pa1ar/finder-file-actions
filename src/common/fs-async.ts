@@ -49,13 +49,14 @@ async function moveWithProgress(
 
     // Then remove the source file
     await fs.remove(sourcePath);
-    return { success: true };
+    return { success: true, skipped: false };
   } catch (error) {
     // Clean up destination if something went wrong
     await fs.remove(destPath).catch(() => {});
     return {
       success: false,
       error: error instanceof Error ? error : new Error("Unknown error during move"),
+      skipped: false,
     };
   }
 }
@@ -84,6 +85,7 @@ async function copyWithProgress(
       resolve({
         success: false,
         error: error instanceof Error ? error : new Error("Unknown error during copy"),
+        skipped: false,
       });
     };
 
@@ -99,7 +101,7 @@ async function copyWithProgress(
 
     writeStream.on("finish", async () => {
       await cleanup(readStream, writeStream);
-      resolve({ success: true });
+      resolve({ success: true, skipped: false });
     });
 
     readStream.pipe(writeStream);
@@ -182,11 +184,12 @@ export const fsAsync = {
 
       // For smaller files, use direct move
       await fs.move(sourcePath, destPath, { overwrite: options.overwrite });
-      return { success: true };
+      return { success: true, skipped: false };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error : new Error("Unknown error during move"),
+        skipped: false,
       };
     }
   },
@@ -213,11 +216,12 @@ export const fsAsync = {
 
       // For smaller files, use direct copy
       await fs.copy(sourcePath, destPath, { overwrite: options.overwrite });
-      return { success: true };
+      return { success: true, skipped: false };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error : new Error("Unknown error during copy"),
+        skipped: false,
       };
     }
   },
