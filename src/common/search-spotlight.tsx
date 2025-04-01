@@ -47,18 +47,18 @@ const getSystemFolderPaths = async (): Promise<Map<string, string>> => {
       
       return folderPaths
     `;
-    
+
     const result = await runAppleScript(script);
     const paths = result.split(",");
-    
+
     // Create a map of folder type to path
     const folderMap = new Map<string, string>();
     const folderTypes = ["desktop", "documents", "downloads", "pictures", "music", "movies"];
-    
+
     for (let i = 0; i < Math.min(paths.length, folderTypes.length); i++) {
       folderMap.set(folderTypes[i], paths[i].trim());
     }
-    
+
     return folderMap;
   } catch (error) {
     console.error("Error getting system folder paths:", error);
@@ -74,77 +74,83 @@ const searchSpotlight = (
 ): Promise<void> => {
   const { maxResults } = getPreferenceValues<SpotlightSearchPreferences>();
   const isExactSearch = search.startsWith("[") && search.endsWith("]");
-  
+
   // Track paths we've already added to prevent duplicates
   const addedPaths = new Set<string>();
   // Collect all results before calling callback
   const allResults: SpotlightSearchResult[] = [];
-  
-  return new Promise(async (resolve, reject) => {
+
+  return new Promise((resolve, reject) => {
     const spotlightSearchAttributes: string[] = folderSpotlightSearchAttributes;
-    
+
     // For system folders, we'll search both the display name and the path
     const searchFilter = isExactSearch
       ? ["kMDItemContentType=='public.folder'", `kMDItemDisplayName == '${search.replace(/[[|\]]/gi, "")}'`]
-      : ["kMDItemContentType=='public.folder'", 
-         `(kMDItemDisplayName = "*${search}*"cd || kMDItemPath = "*${search}*"cd)`];
+      : [
+          "kMDItemContentType=='public.folder'",
+          `(kMDItemDisplayName = "*${search}*"cd || kMDItemPath = "*${search}*"cd)`,
+        ];
 
     let resultsCount = 0;
-    
+
     // Check for system folder matches
     const lowerSearch = search.toLowerCase();
     const systemFolderTypes = ["desktop", "documents", "downloads", "pictures", "music", "movies"];
-    
+
     // Only attempt to get system folders if the search might match one of them
-    const mightMatchSystemFolder = systemFolderTypes.some(type => 
-        type.includes(lowerSearch) || lowerSearch.includes(type));
-    
+    const mightMatchSystemFolder = systemFolderTypes.some(
+      (type) => type.includes(lowerSearch) || lowerSearch.includes(type)
+    );
+
     // If the search might match a system folder, try to get those first
     // as they should have higher priority than regular search results
     if (mightMatchSystemFolder) {
-      try {
-        // Get system folder paths
-        const folderMap = await getSystemFolderPaths();
-        
-        // Check each folder to see if it matches the search
-        for (const [folderType, folderPath] of folderMap.entries()) {
-          if (folderType.includes(lowerSearch) || lowerSearch.includes(folderType)) {
-            // Only add if the path exists and we haven't added it yet
-            if (fs.existsSync(folderPath)) {
-              const normalizedPath = normalizePath(folderPath);
-              if (!addedPaths.has(normalizedPath)) {
-                const stats = fs.statSync(folderPath);
-                // Use the last path component as a fallback name
-                const folderName = path.basename(folderPath);
-                
-                const result: SpotlightSearchResult = {
-                  path: folderPath,
-                  kMDItemFSName: folderName,
-                  kMDItemDisplayName: folderName,
-                  kMDItemKind: "Folder",
-                  kMDItemFSSize: 0,
-                  kMDItemFSCreationDate: stats.birthtime,
-                  kMDItemContentModificationDate: stats.mtime,
-                  kMDItemLastUsedDate: stats.atime,
-                  kMDItemUseCount: 0,
-                };
-                
-                addedPaths.add(normalizedPath);
-                resultsCount++;
-                allResults.push(result);
-                
-                // If we've hit the max results, we're done
-                if (resultsCount >= maxResults) {
-                  callback(allResults);
-                  return resolve();
+      (async () => {
+        try {
+          // Get system folder paths
+          const folderMap = await getSystemFolderPaths();
+
+          // Check each folder to see if it matches the search
+          for (const [folderType, folderPath] of folderMap.entries()) {
+            if (folderType.includes(lowerSearch) || lowerSearch.includes(folderType)) {
+              // Only add if the path exists and we haven't added it yet
+              if (fs.existsSync(folderPath)) {
+                const normalizedPath = normalizePath(folderPath);
+                if (!addedPaths.has(normalizedPath)) {
+                  const stats = fs.statSync(folderPath);
+                  // Use the last path component as a fallback name
+                  const folderName = path.basename(folderPath);
+
+                  const result: SpotlightSearchResult = {
+                    path: folderPath,
+                    kMDItemFSName: folderName,
+                    kMDItemDisplayName: folderName,
+                    kMDItemKind: "Folder",
+                    kMDItemFSSize: 0,
+                    kMDItemFSCreationDate: stats.birthtime,
+                    kMDItemContentModificationDate: stats.mtime,
+                    kMDItemLastUsedDate: stats.atime,
+                    kMDItemUseCount: 0,
+                  };
+
+                  addedPaths.add(normalizedPath);
+                  resultsCount++;
+                  allResults.push(result);
+
+                  // If we've hit the max results, we're done
+                  if (resultsCount >= maxResults) {
+                    callback(allResults);
+                    resolve();
+                    return;
+                  }
                 }
               }
             }
           }
+        } catch (error) {
+          console.error("Error processing system folders:", error);
         }
-      } catch (error) {
-        console.error("Error processing system folders:", error);
-      }
+      })();
     }
 
     // Continue with regular Spotlight search for other folders
@@ -154,14 +160,14 @@ const searchSpotlight = (
         const normalizedPath = normalizePath(result.path);
         if (!addedPaths.has(normalizedPath)) {
           addedPaths.add(normalizedPath);
-          
+
           if (resultsCount < maxResults) {
             resultsCount++;
             allResults.push(result);
           } else if (resultsCount >= maxResults) {
             abortable?.current?.abort();
             callback(allResults);
-            setTimeout(() => { resolve(); }, 0);
+            resolve();
           }
         }
       })

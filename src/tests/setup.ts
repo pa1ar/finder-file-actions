@@ -1,12 +1,12 @@
-import { jest } from '@jest/globals';
+import { jest } from "@jest/globals";
 
 // Mock Raycast API
-jest.mock('@raycast/api', () => ({
+jest.mock("@raycast/api", () => ({
   showToast: jest.fn(),
   Toast: {
     Style: {
-      Success: 'success',
-      Failure: 'failure',
+      Success: "success",
+      Failure: "failure",
     },
   },
   confirmAlert: jest.fn().mockResolvedValue(true),
@@ -15,7 +15,7 @@ jest.mock('@raycast/api', () => ({
     maxResults: 50,
   }),
   environment: {
-    extensionName: 'test-extension',
+    extensionName: "test-extension",
   },
   LocalStorage: {
     getItem: jest.fn(),
@@ -24,6 +24,6 @@ jest.mock('@raycast/api', () => ({
 }));
 
 // Mock run-applescript
-jest.mock('run-applescript', () => ({
-  runAppleScript: jest.fn().mockResolvedValue(''),
-})); 
+jest.mock("run-applescript", () => ({
+  runAppleScript: jest.fn().mockResolvedValue(""),
+}));

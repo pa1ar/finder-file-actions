@@ -25,6 +25,7 @@ import path from "path";
 import { searchSpotlight } from "./common/search-spotlight";
 import { SpotlightSearchPreferences, SpotlightSearchResult } from "./common/types";
 import { folderName, lastUsedSort, fixDoubleConcat } from "./common/utils";
+import { fsAsync } from "./common/fs-async";
 
 interface RecentFolder extends SpotlightSearchResult {
   lastUsed: Date;
@@ -298,7 +299,7 @@ export default function Command(props: LaunchProps) {
   // Move files to selected folder
   async function moveFilesToFolder(destinationPath: string) {
     // Check if destination folder exists
-    if (!fs.existsSync(destinationPath)) {
+    if (!(await fsAsync.exists(destinationPath))) {
       console.error(`Destination folder does not exist: ${destinationPath}`);
       showToast({
         title: "Error",
@@ -311,46 +312,82 @@ export default function Command(props: LaunchProps) {
     setIsLoading(true);
 
     try {
-      // Verify destination folder exists
-      if (!fs.existsSync(destinationPath) || !fs.statSync(destinationPath).isDirectory()) {
-        throw new Error("Destination folder does not exist");
+      // Verify destination folder exists and is a directory
+      const stats = await fsAsync.getStats(destinationPath);
+      if (!stats?.isDirectory) {
+        throw new Error("Destination is not a folder");
       }
 
       let successCount = 0;
       let failCount = 0;
 
-      for (const filePath of selectedFiles) {
-        try {
-          const fileName = path.basename(filePath);
-          const destFilePath = path.join(destinationPath, fileName);
+      // Process files in batches for better performance
+      const results = await fsAsync.batchProcess(
+        selectedFiles,
+        async (filePath) => {
+          try {
+            const fileName = path.basename(filePath);
+            const destFilePath = path.join(destinationPath, fileName);
 
-          // Check if file already exists at destination
-          if (fs.existsSync(destFilePath)) {
-            const overwrite = await confirmAlert({
-              title: "Overwrite the existing file?",
-              message: fileName + " already exists in " + destinationPath,
+            // Check if file already exists at destination
+            if (await fsAsync.exists(destFilePath)) {
+              const overwrite = await confirmAlert({
+                title: "Overwrite the existing file?",
+                message: fileName + " already exists in " + destinationPath,
+              });
+
+              if (!overwrite) {
+                return { success: false, skipped: true };
+              }
+
+              if (filePath === destFilePath) {
+                await showHUD("The source and destination file are the same");
+                return { success: false, skipped: true };
+              }
+            }
+
+            // Move the file with progress tracking
+            const result = await fsAsync.moveFile(filePath, destFilePath, {
+              overwrite: true,
+              onProgress: (percent) => {
+                // Update progress toast for large files
+                if (percent % 10 === 0) {
+                  // Update every 10%
+                  showToast({
+                    title: `Moving ${fileName}`,
+                    message: `${Math.round(percent)}% complete`,
+                    style: Toast.Style.Animated,
+                  });
+                }
+              },
             });
 
-            if (!overwrite) {
-              failCount++;
-              continue;
-            }
-
-            if (filePath === destFilePath) {
-              await showHUD("The source and destination file are the same");
-              failCount++;
-              continue;
-            }
+            return result;
+          } catch (error) {
+            console.error(`Error moving file ${filePath}:`, error);
+            return { success: false, error };
           }
+        },
+        {
+          concurrency: 3,
+          onProgress: (completed, total) => {
+            showToast({
+              title: `Moving Files`,
+              message: `${completed}/${total} files processed`,
+              style: Toast.Style.Animated,
+            });
+          },
+        }
+      );
 
-          // Move the file
-          await fs.move(filePath, destFilePath, { overwrite: true });
+      // Count successes and failures
+      results.forEach((result) => {
+        if (result.success) {
           successCount++;
-        } catch (error) {
-          console.error(`Error moving file ${filePath}:`, error);
+        } else if (!result.skipped) {
           failCount++;
         }
-      }
+      });
 
       // Update recent folders with this destination
       const destinationFolder =
@@ -360,17 +397,16 @@ export default function Command(props: LaunchProps) {
         addToRecentFolders(destinationFolder);
       } else if (destinationPath === currentPath) {
         // If the destination is the current navigation path, add it to recent folders
-        // First check if the folder exists
-        if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).isDirectory()) {
-          // Create a minimal folder object with just the required path
+        const stats = await fsAsync.getStats(destinationPath);
+        if (stats?.isDirectory) {
           const navFolder: SpotlightSearchResult = {
             path: destinationPath,
             kMDItemFSName: path.basename(destinationPath),
             kMDItemKind: "Folder",
             kMDItemFSSize: 0,
-            kMDItemFSCreationDate: new Date(),
-            kMDItemContentModificationDate: new Date(),
-            kMDItemLastUsedDate: new Date(),
+            kMDItemFSCreationDate: stats.birthtime,
+            kMDItemContentModificationDate: stats.mtime,
+            kMDItemLastUsedDate: stats.atime,
             kMDItemUseCount: 0,
           };
 
@@ -411,7 +447,7 @@ export default function Command(props: LaunchProps) {
   // Copy files to selected folder
   async function copyFilesToFolder(destinationPath: string) {
     // Check if destination folder exists
-    if (!fs.existsSync(destinationPath)) {
+    if (!(await fsAsync.exists(destinationPath))) {
       console.error(`Destination folder does not exist: ${destinationPath}`);
       showToast({
         title: "Error",
@@ -424,46 +460,82 @@ export default function Command(props: LaunchProps) {
     setIsLoading(true);
 
     try {
-      // Verify destination folder exists
-      if (!fs.existsSync(destinationPath) || !fs.statSync(destinationPath).isDirectory()) {
-        throw new Error("Destination folder does not exist");
+      // Verify destination folder exists and is a directory
+      const stats = await fsAsync.getStats(destinationPath);
+      if (!stats?.isDirectory) {
+        throw new Error("Destination is not a folder");
       }
 
       let successCount = 0;
       let failCount = 0;
 
-      for (const filePath of selectedFiles) {
-        try {
-          const fileName = path.basename(filePath);
-          const destFilePath = path.join(destinationPath, fileName);
+      // Process files in batches for better performance
+      const results = await fsAsync.batchProcess(
+        selectedFiles,
+        async (filePath) => {
+          try {
+            const fileName = path.basename(filePath);
+            const destFilePath = path.join(destinationPath, fileName);
 
-          // Check if file already exists at destination
-          if (fs.existsSync(destFilePath)) {
-            const overwrite = await confirmAlert({
-              title: "Overwrite the existing file?",
-              message: fileName + " already exists in " + destinationPath,
+            // Check if file already exists at destination
+            if (await fsAsync.exists(destFilePath)) {
+              const overwrite = await confirmAlert({
+                title: "Overwrite the existing file?",
+                message: fileName + " already exists in " + destinationPath,
+              });
+
+              if (!overwrite) {
+                return { success: false, skipped: true };
+              }
+
+              if (filePath === destFilePath) {
+                await showHUD("The source and destination file are the same");
+                return { success: false, skipped: true };
+              }
+            }
+
+            // Copy the file with progress tracking
+            const result = await fsAsync.copyFile(filePath, destFilePath, {
+              overwrite: true,
+              onProgress: (percent) => {
+                // Update progress toast for large files
+                if (percent % 10 === 0) {
+                  // Update every 10%
+                  showToast({
+                    title: `Copying ${fileName}`,
+                    message: `${Math.round(percent)}% complete`,
+                    style: Toast.Style.Animated,
+                  });
+                }
+              },
             });
 
-            if (!overwrite) {
-              failCount++;
-              continue;
-            }
-
-            if (filePath === destFilePath) {
-              await showHUD("The source and destination file are the same");
-              failCount++;
-              continue;
-            }
+            return result;
+          } catch (error) {
+            console.error(`Error copying file ${filePath}:`, error);
+            return { success: false, error };
           }
+        },
+        {
+          concurrency: 3,
+          onProgress: (completed, total) => {
+            showToast({
+              title: `Copying Files`,
+              message: `${completed}/${total} files processed`,
+              style: Toast.Style.Animated,
+            });
+          },
+        }
+      );
 
-          // Copy the file
-          await fs.copy(filePath, destFilePath, { overwrite: true });
+      // Count successes and failures
+      results.forEach((result) => {
+        if (result.success) {
           successCount++;
-        } catch (error) {
-          console.error(`Error copying file ${filePath}:`, error);
+        } else if (!result.skipped) {
           failCount++;
         }
-      }
+      });
 
       // Update recent folders with this destination
       const destinationFolder =
@@ -473,17 +545,16 @@ export default function Command(props: LaunchProps) {
         addToRecentFolders(destinationFolder);
       } else if (destinationPath === currentPath) {
         // If the destination is the current navigation path, add it to recent folders
-        // First check if the folder exists
-        if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).isDirectory()) {
-          // Create a minimal folder object with just the required path
+        const stats = await fsAsync.getStats(destinationPath);
+        if (stats?.isDirectory) {
           const navFolder: SpotlightSearchResult = {
             path: destinationPath,
             kMDItemFSName: path.basename(destinationPath),
             kMDItemKind: "Folder",
             kMDItemFSSize: 0,
-            kMDItemFSCreationDate: new Date(),
-            kMDItemContentModificationDate: new Date(),
-            kMDItemLastUsedDate: new Date(),
+            kMDItemFSCreationDate: stats.birthtime,
+            kMDItemContentModificationDate: stats.mtime,
+            kMDItemLastUsedDate: stats.atime,
             kMDItemUseCount: 0,
           };
 
