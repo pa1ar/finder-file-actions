@@ -36,7 +36,7 @@ This extension is live in the Raycast Store. Standalone repo publishes to the Ra
 6. Update CHANGELOG.md with `## [Title] - {PR_MERGE_DATE}` format (date placeholder replaced on merge)
 
 ### Notes
-- Raycast CI uses npm; `package-lock.json` is gitignored here but `ray publish` handles it
+- Raycast CI uses `npm ci` which requires `package-lock.json` in sync - must be tracked in git
 - Monorepo fork: `~/.config/raycast/public-extensions-fork/`
 - If `ray publish` fails with OAuth scope error, manually sync fork at https://github.com/pa1ar/raycast-extensions
 - Bug reports come from https://www.raycast.com/pa1ar/finder-file-actions (extension issues tab)
