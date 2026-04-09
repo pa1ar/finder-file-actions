@@ -17,7 +17,7 @@ import {
 } from "@raycast/api";
 
 import { usePromise } from "@raycast/utils";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { runAppleScript } from "run-applescript";
 import fs from "fs-extra";
 import path from "path";
@@ -37,7 +37,6 @@ export default function Command(props: LaunchProps) {
   const [folders, setFolders] = useState<SpotlightSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isQuerying, setIsQuerying] = useState<boolean>(false);
-  const [canExecute, setCanExecute] = useState<boolean>(false);
   const [hasCheckedPreferences, setHasCheckedPreferences] = useState<boolean>(false);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [isShowingDetail, setIsShowingDetail] = useState<boolean>(false);
@@ -241,6 +240,11 @@ export default function Command(props: LaunchProps) {
     });
   }
 
+  // Stable callback for search results
+  const onSearchResult = useCallback((result: SpotlightSearchResult) => {
+    setFolders((folders) => [result, ...folders].sort(lastUsedSort));
+  }, []);
+
   // Perform search
   usePromise(
     searchSpotlight,
@@ -248,14 +252,11 @@ export default function Command(props: LaunchProps) {
       searchText,
       currentPath || "",
       abortable,
-      (result: SpotlightSearchResult) => {
-        setFolders((folders) => [result, ...folders].sort(lastUsedSort));
-      },
+      onSearchResult,
     ],
     {
       onWillExecute: () => {
         setIsQuerying(true);
-        setCanExecute(false);
         // Clear folders when starting a new search
         setFolders([]);
       },
@@ -272,20 +273,10 @@ export default function Command(props: LaunchProps) {
         }
         setIsQuerying(false);
       },
-      execute: hasCheckedPreferences && canExecute && !!searchText,
+      execute: hasCheckedPreferences && !!searchText,
       abortable,
     }
   );
-
-  // Reset search when text changes
-  useEffect(() => {
-    (async () => {
-      abortable.current?.abort();
-      setFolders([]);
-      setIsQuerying(false);
-      setCanExecute(true);
-    })();
-  }, [searchText]);
 
   // Add a useEffect to focus the first search result when search text changes
   useEffect(() => {
