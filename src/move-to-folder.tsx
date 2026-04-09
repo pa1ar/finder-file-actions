@@ -278,6 +278,13 @@ export default function Command(props: LaunchProps) {
     }
   );
 
+  // Clear stale results when search text is cleared
+  useEffect(() => {
+    if (!searchText) {
+      setFolders([]);
+    }
+  }, [searchText]);
+
   // Add a useEffect to focus the first search result when search text changes
   useEffect(() => {
     if (searchText && folders.length > 0) {
