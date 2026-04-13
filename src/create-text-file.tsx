@@ -5,9 +5,21 @@ import { isFinderFrontmost, getCurrentFinderDirectory, selectInFinder, generateU
 import { fsAsync } from "./common/fs-async";
 
 export default async function CreateTextFile(props: LaunchProps<{ arguments: Arguments.CreateTextFile }>) {
-  const rawExt = props.arguments.extension?.trim() || "txt";
-  // strip leading dot if user typed ".md" instead of "md"
-  const extension = rawExt.replace(/^\./, "");
+  const rawInput = props.arguments.extension?.trim() || "";
+  // parse input: "file.txt" -> name="file", ext="txt"; "md" -> name="untitled", ext="md"; "" -> name="untitled", ext="txt"
+  let baseName = "untitled";
+  let extension = "txt";
+  if (rawInput) {
+    const dotIndex = rawInput.lastIndexOf(".");
+    if (dotIndex > 0) {
+      // user typed a full filename like "file.txt" or "notes.md"
+      baseName = rawInput.slice(0, dotIndex);
+      extension = rawInput.slice(dotIndex + 1);
+    } else {
+      // user typed just an extension like "md" or ".md"
+      extension = rawInput.replace(/^\./, "");
+    }
+  }
 
   const frontmost = await isFinderFrontmost();
   if (!frontmost) {
@@ -31,7 +43,7 @@ export default async function CreateTextFile(props: LaunchProps<{ arguments: Arg
   }
 
   // generate unique filename
-  const uniqueName = await generateUniqueName(targetDir, "untitled", extension);
+  const uniqueName = await generateUniqueName(targetDir, baseName, extension);
   const filePath = path.join(targetDir, uniqueName);
 
   // write the file
