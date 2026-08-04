@@ -3,23 +3,10 @@ import path from "path";
 
 import { isFinderFrontmost, getCurrentFinderDirectory, selectInFinder, generateUniqueName } from "./common/finder";
 import { fsAsync } from "./common/fs-async";
+import { parseTextFileName } from "./common/text-file-name";
 
 export default async function CreateTextFile(props: LaunchProps<{ arguments: Arguments.CreateTextFile }>) {
-  const rawInput = props.arguments.extension?.trim() || "";
-  // parse input: "file.txt" -> name="file", ext="txt"; "md" -> name="untitled", ext="md"; "" -> name="untitled", ext="txt"
-  let baseName = "untitled";
-  let extension = "txt";
-  if (rawInput) {
-    const dotIndex = rawInput.lastIndexOf(".");
-    if (dotIndex > 0) {
-      // user typed a full filename like "file.txt" or "notes.md"
-      baseName = rawInput.slice(0, dotIndex);
-      extension = rawInput.slice(dotIndex + 1);
-    } else {
-      // user typed just an extension like "md" or ".md"
-      extension = rawInput.replace(/^\./, "");
-    }
-  }
+  const { baseName, extension } = parseTextFileName(props.arguments.filename);
 
   const frontmost = await isFinderFrontmost();
   if (!frontmost) {

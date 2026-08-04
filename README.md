@@ -39,7 +39,7 @@ Create a new folder and move the selected Finder files into it.
 
 ### Create Text File
 
-Create a text file with any extension. Auto-fills with clipboard content when available.
+Create a text file with an optional filename. Names without an extension default to `.txt`. Auto-fills with clipboard content when available.
 
 ![Create Text File](metadata/finder-file-actions-4.png)
 
