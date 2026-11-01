@@ -95,6 +95,24 @@
   ],
   "preferences": [
     {
+      "default": "finder",
+      "description": "Which app the commands read their selection and working directory from",
+      "name": "fileManager",
+      "required": false,
+      "title": "File Manager",
+      "type": "dropdown",
+      "data": [
+        {
+          "title": "Finder",
+          "value": "finder"
+        },
+        {
+          "title": "Bloom",
+          "value": "bloom"
+        }
+      ]
+    },
+    {
       "default": "250",
       "description": "The maximum number of search results that should be returned",
       "name": "maxResults",

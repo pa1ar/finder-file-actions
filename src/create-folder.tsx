@@ -1,19 +1,25 @@
 import { closeMainWindow, LaunchProps, showHUD } from "@raycast/api";
 import path from "path";
 
-import { isFinderFrontmost, getCurrentFinderDirectory, selectInFinder, generateUniqueName } from "./common/finder";
+import {
+  fileManagerLabel,
+  generateUniqueName,
+  getCurrentDirectory,
+  isFileManagerAvailable,
+  revealItem,
+} from "./common/file-manager";
 import { fsAsync } from "./common/fs-async";
 
 export default async function CreateFolder(props: LaunchProps<{ arguments: Arguments.CreateFolder }>) {
   const folderName = props.arguments.folderName?.trim() || "untitled folder";
 
-  const frontmost = await isFinderFrontmost();
-  if (!frontmost) {
-    await showHUD("Finder is not the active application");
+  const available = await isFileManagerAvailable();
+  if (!available) {
+    await showHUD(`${fileManagerLabel()} is not the active application`);
     return;
   }
 
-  const targetDir = await getCurrentFinderDirectory();
+  const targetDir = await getCurrentDirectory();
   const uniqueName = await generateUniqueName(targetDir, folderName);
   const newFolderPath = path.join(targetDir, uniqueName);
 
@@ -24,6 +30,6 @@ export default async function CreateFolder(props: LaunchProps<{ arguments: Argum
   }
 
   await showHUD(`Created "${uniqueName}"`);
-  await selectInFinder(newFolderPath);
+  await revealItem(newFolderPath);
   await closeMainWindow();
 }

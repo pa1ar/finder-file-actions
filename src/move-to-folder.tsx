@@ -11,7 +11,6 @@ import {
   popToRoot,
   showToast,
   getPreferenceValues,
-  getSelectedFinderItems,
   showHUD,
   confirmAlert,
   LaunchProps,
@@ -28,8 +27,9 @@ import { SpotlightSearchPreferences, SpotlightSearchResult, PinnedFolder } from 
 import { folderName, lastUsedSort, fixDoubleConcat, pinnedFolderName } from "./common/utils";
 import { fsAsync } from "./common/fs-async";
 import { CacheManager } from "./common/cache-manager";
-import { isFinderFrontmost } from "./common/finder";
+import { fileManagerLabel, getFileManager, getSelectedFiles, isFileManagerAvailable } from "./common/file-manager";
 import { FinderFileOperation, performFinderFileOperation } from "./common/finder-file-operations";
+import { performBloomFileOperation } from "./common/bloom-file-operations";
 
 interface RecentFolder extends SpotlightSearchResult {
   lastUsed: Date;
@@ -106,36 +106,35 @@ export default function Command(props: LaunchProps) {
     );
   });
 
-  // Function to get selected files from Finder
-  async function getSelectedFinderFiles() {
+  // Function to get selected files from the configured file manager
+  async function getSelectedFilesFromManager() {
+    const label = fileManagerLabel();
     try {
-      // First check if Finder is the frontmost application
-      const finderIsFrontmost = await isFinderFrontmost();
-      if (!finderIsFrontmost) {
-        setSelectionError("Please select files in Finder first and make sure Finder is the active application.");
+      // The app must be running with a window open
+      const available = await isFileManagerAvailable();
+      if (!available) {
+        setSelectionError(`Please select files in ${label} first and make sure ${label} is the active application.`);
         setIsLoading(false);
         return;
       }
 
-      const selectedItems = await getSelectedFinderItems();
+      const filePaths = await getSelectedFiles();
 
-      if (selectedItems && selectedItems.length > 0) {
-        const filePaths = selectedItems.map((item) => item.path);
+      if (filePaths && filePaths.length > 0) {
         setSelectedFiles(filePaths);
         setSelectionError(null);
         setIsLoading(false);
       } else {
-        setSelectionError("No files selected. Please select files in Finder first.");
+        setSelectionError(`No files selected. Please select files in ${label} first.`);
         setIsLoading(false);
       }
     } catch (error) {
       console.error(error);
 
-      // Check if the error is because Finder isn't the frontmost application
-      if (error instanceof Error && error.message.includes("Finder isn't the frontmost application")) {
-        setSelectionError("Please select files in Finder first and make sure Finder is the active application.");
+      if (error instanceof Error && error.message.includes("Bloom is not running")) {
+        setSelectionError("Bloom isn't running. Open Bloom and select the files first.");
       } else {
-        setSelectionError("Failed to get selected files from Finder. Please try again.");
+        setSelectionError(`Failed to get selected files from ${label}. Please try again.`);
       }
 
       setIsLoading(false);
@@ -184,9 +183,9 @@ export default function Command(props: LaunchProps) {
     }
   }, [searchText]);
 
-  // Get selected files from Finder
+  // Get selected files from the configured file manager
   useEffect(() => {
-    getSelectedFinderFiles();
+    getSelectedFilesFromManager();
     loadRecentFolders();
   }, []);
 
@@ -376,8 +375,24 @@ export default function Command(props: LaunchProps) {
         style: Toast.Style.Animated,
       });
 
-      await performFinderFileOperation(operation, filesToTransfer, destinationPath, replacing);
-      const successCount = filesToTransfer.length;
+      // Finder gets its native move/duplicate so Cmd+Z works there; Bloom has no
+      // scripting equivalent, so its transfers go through fsAsync instead.
+      let successCount = filesToTransfer.length;
+      if (getFileManager() === "bloom") {
+        const opResult = await performBloomFileOperation(operation, filesToTransfer, destinationPath, replacing);
+        successCount = operation === "move" ? opResult.moved : opResult.copied;
+
+        if (opResult.failed.length > 0) {
+          console.error("Some files failed:", opResult.failed);
+          showToast({
+            title: `${opResult.failed.length} file${opResult.failed.length === 1 ? "" : "s"} failed`,
+            message: opResult.failed[0].error,
+            style: Toast.Style.Failure,
+          });
+        }
+      } else {
+        await performFinderFileOperation(operation, filesToTransfer, destinationPath, replacing);
+      }
 
       // Update recent folders with this destination
       const destinationFolder =
@@ -406,7 +421,11 @@ export default function Command(props: LaunchProps) {
 
       showToast({
         title: `${pastTense} ${successCount} file${successCount !== 1 ? "s" : ""}`,
-        message: replacing ? "Finder Undo won't restore replaced items" : "Undo is available in Finder",
+        message: replacing
+          ? "Replaced existing items"
+          : getFileManager() === "finder"
+            ? "Undo is available in Finder"
+            : undefined,
         style: Toast.Style.Success,
       });
 
@@ -628,7 +647,7 @@ export default function Command(props: LaunchProps) {
                 onAction={() => {
                   setIsLoading(true);
                   setSelectionError(null);
-                  getSelectedFinderFiles();
+                  getSelectedFilesFromManager();
                 }}
               />
             </ActionPanel>
