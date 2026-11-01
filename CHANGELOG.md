@@ -1,5 +1,12 @@
 # Finder File Actions Changelog
 
+## [Bloom support] - {PR_MERGE_DATE}
+
+- Added a **File Manager** preference to choose between Finder (default) and [Bloom](https://bloomapp.club)
+- When set to Bloom, all five commands read their selection and working directory from Bloom's front window instead of Finder
+- Bloom transfers go through `fsAsync` rather than Finder's `move`/`duplicate`, since Bloom exposes no scripting verb for them
+- No behaviour change for Finder users; `src/common/finder.ts` and `finder-file-operations.ts` are untouched
+
 ## [Finder-native undo and filename handling] - {PR_MERGE_DATE}
 
 - Fixed "Create Text File" treating a typed filename as an extension and creating names such as `untitled.notes`

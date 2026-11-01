@@ -1,29 +1,34 @@
-import { closeMainWindow, getSelectedFinderItems, LaunchProps, showHUD } from "@raycast/api";
+import { closeMainWindow, LaunchProps, showHUD } from "@raycast/api";
 import path from "path";
 
-import { isFinderFrontmost, selectInFinder, generateUniqueName } from "./common/finder";
+import {
+  fileManagerLabel,
+  generateUniqueName,
+  getSelectedFiles,
+  isFileManagerAvailable,
+  revealItem,
+} from "./common/file-manager";
 import { fsAsync } from "./common/fs-async";
 
 export default async function WrapInFolder(props: LaunchProps<{ arguments: Arguments.WrapInFolder }>) {
   const folderName = props.arguments.folderName?.trim() || "untitled folder";
 
-  const frontmost = await isFinderFrontmost();
-  if (!frontmost) {
-    await showHUD("Finder is not the active application");
+  const available = await isFileManagerAvailable();
+  if (!available) {
+    await showHUD(`${fileManagerLabel()} is not the active application`);
     return;
   }
 
   // get selected files - required for this command
   let selectedFiles: string[] = [];
   try {
-    const items = await getSelectedFinderItems();
-    selectedFiles = items.map((item) => item.path);
+    selectedFiles = await getSelectedFiles();
   } catch {
     // no selection
   }
 
   if (selectedFiles.length === 0) {
-    await showHUD("No files selected in Finder");
+    await showHUD(`No files selected in ${fileManagerLabel()}`);
     return;
   }
 
@@ -55,6 +60,6 @@ export default async function WrapInFolder(props: LaunchProps<{ arguments: Argum
     await showHUD(`Created "${uniqueName}" with ${selectedFiles.length} file(s)`);
   }
 
-  await selectInFinder(newFolderPath);
+  await revealItem(newFolderPath);
   await closeMainWindow();
 }

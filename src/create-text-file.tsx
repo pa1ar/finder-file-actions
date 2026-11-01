@@ -1,20 +1,26 @@
 import { Clipboard, closeMainWindow, LaunchProps, showHUD } from "@raycast/api";
 import path from "path";
 
-import { isFinderFrontmost, getCurrentFinderDirectory, selectInFinder, generateUniqueName } from "./common/finder";
+import {
+  fileManagerLabel,
+  generateUniqueName,
+  getCurrentDirectory,
+  isFileManagerAvailable,
+  revealItem,
+} from "./common/file-manager";
 import { fsAsync } from "./common/fs-async";
 import { parseTextFileName } from "./common/text-file-name";
 
 export default async function CreateTextFile(props: LaunchProps<{ arguments: Arguments.CreateTextFile }>) {
   const { baseName, extension } = parseTextFileName(props.arguments.filename);
 
-  const frontmost = await isFinderFrontmost();
-  if (!frontmost) {
-    await showHUD("Finder is not the active application");
+  const available = await isFileManagerAvailable();
+  if (!available) {
+    await showHUD(`${fileManagerLabel()} is not the active application`);
     return;
   }
 
-  const targetDir = await getCurrentFinderDirectory();
+  const targetDir = await getCurrentDirectory();
 
   // read clipboard text if available
   let content = "";
@@ -46,6 +52,6 @@ export default async function CreateTextFile(props: LaunchProps<{ arguments: Arg
     await showHUD(`Created "${uniqueName}"`);
   }
 
-  await selectInFinder(filePath);
+  await revealItem(filePath);
   await closeMainWindow();
 }

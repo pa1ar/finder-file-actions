@@ -6,6 +6,19 @@ File operations for macOS Finder via [Raycast](https://raycast.com).
 
 ![Commands](metadata/finder-file-actions-3.png)
 
+## Supported file managers
+
+By default the commands read the selection and working directory from Finder. If you use [Bloom](https://bloomapp.club) as your Finder replacement, set **File Manager** to **Bloom** in the extension preferences and the same commands operate on Bloom's selection instead.
+
+| | Finder (default) | Bloom |
+|:---|:---|:---|
+| Selection source | Raycast's `getSelectedFinderItems` | Bloom's AppleScript `selection` |
+| Working directory | Front Finder window's target | Bloom's front window `rootPath` |
+| Move / copy | Finder's native `move` / `duplicate` | `fsAsync`, no Finder involved |
+| Undo | `Cmd+Z` in Finder | none — the operation is not journalled |
+
+Bloom support requires Bloom to be running with a window open. Nothing changes for Finder users who leave the preference alone.
+
 ## Commands
 
 ### Move to Folder
@@ -59,3 +72,5 @@ Create a text file with an optional filename. Names without an extension default
 ## Credits
 
 Folder search adapted from [Folder Search](https://www.raycast.com/GastroGeek/folder-search) by [GastroGeek](https://www.raycast.com/GastroGeek).
+
+Bloom support contributed by [@mannycastaneda](https://github.com/mannycastaneda).
